@@ -9,7 +9,12 @@ Giải pháp triển khai AI Agent (OpenClaw) tích hợp n8n và giao thức MC
 - **Phù hợp**: VPS (Ubuntu 22.04+).
 - **Tính năng**: Cài đặt OpenClaw, n8n, MCP Server, Caddy, Postgres, Redis.
 
-### 2. [Raspberry Pi ARM Toolbox](./raspberry-pi)
+### 2. [LobeHub Pi 4 Installer](./lobehub-pi)
+Script tự động hóa cài đặt LobeHub v2.0+ (phiên bản database) tối ưu cho Raspberry Pi.
+- **Phù hợp**: Raspberry Pi 4 (8GB) / Pi 5 (ARM64).
+- **Tính năng**: PostgreSQL + pgvector, S3 Storage, Search Engine, Redis.
+
+### 3. [Raspberry Pi ARM Toolbox](./raspberry-pi)
 Bộ scripts tối ưu dành riêng cho Raspberry Pi hoặc các thiết bị sử dụng kiến trúc ARM.
 - **Phù hợp**: Raspberry Pi 4/5, máy chủ ARM.
 - **Tính năng**: Cài đặt Docker, Docker Compose, Portainer.
