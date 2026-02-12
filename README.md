@@ -1,25 +1,36 @@
-Giới thiệu
-----------------
-Script auto cài đặt docker, docker-compose, portainer cho Raspberry Pi hoặc VPS sử dụng CPU nền tảng ARM
+# duynghien auto-scripts 🚀
 
-Hướng dẫn
-----------------
-Clone về server
-```
-sudo git clone https://github.com/duyasia/auto.git
+Tổng hợp các scripts tự động hóa cài đặt và cấu hình hệ thống, từ các thiết bị Raspberry Pi đến hệ sinh thái AI Agent phức tạp. Toàn bộ scripts được thiết kế để triển khai nhanh chóng (1-Click) và bảo mật.
+
+## 📂 Danh mục công cụ
+
+### 1. [OpenClaw + n8n + MCP Stack](./openclaw-n8n-mcp)
+Giải pháp triển khai AI Agent (OpenClaw) tích hợp n8n và giao thức MCP (Model Context Protocol).
+- **Phù hợp**: VPS (Ubuntu 22.04+).
+- **Tính năng**: Cài đặt OpenClaw, n8n, MCP Server, Caddy, Postgres, Redis.
+
+### 2. [Raspberry Pi ARM Toolbox](./raspberry-pi)
+Bộ scripts tối ưu dành riêng cho Raspberry Pi hoặc các thiết bị sử dụng kiến trúc ARM.
+- **Phù hợp**: Raspberry Pi 4/5, máy chủ ARM.
+- **Tính năng**: Cài đặt Docker, Docker Compose, Portainer.
+
+---
+
+## 🛠️ Cách sử dụng chung
+
+Để bắt đầu, bạn nên clone toàn bộ repository này về máy chủ của mình:
+
+```bash
+git clone https://github.com/duynghien/auto.git
+cd auto
 ```
 
-Cài đặt cả Docker và Portainer:
-```
-sudo sh piDockerPortainer.sh
-```
+Sau đó, di chuyển vào từng thư mục tương ứng để chạy script cài đặt.
 
-Cài đặt riêng Docker:
-```
-sudo sh piDocker.sh
-```
+## 🤝 Liên hệ & Hỗ trợ
+- **Website**: [ai.vnrom.net](https://ai.vnrom.net)
+- **Tác giả**: **duynghien**
+- **Cộng đồng**: Hỗ trợ triển khai các giải pháp AI & Tự động hóa.
 
-Cài đặt riêng Portainer:
-```
-sudo sh piPortainer.sh
-```
+---
+*Lưu ý: Luôn kiểm tra nội dung script trước khi chạy bằng quyền root.*
