@@ -1,20 +1,20 @@
 # LobeHub Mac Installer (M1/M2/M3/M4) 
 
-Script cài đặt tự động LobeHub v2.0+ tối ưu riêng cho người dùng **Mac (Apple Silicon)** sử dụng **OrbStack**. 
+Automatic installation script for LobeHub v2.0+, specifically optimized for **Mac (Apple Silicon)** users using **OrbStack**.
 
-## 🚀 Tại sao nên chạy trên Mac Mini M4?
-- **Sức mạnh Apple Silicon**: Chip M4 xử lý các tác vụ AI và vector database cực nhanh và tiết kiệm điện.
-- **OrbStack**: Hiệu năng vượt trội hơn Docker Desktop, khởi chạy container chỉ trong vài giây và tốn cực ít tài nguyên.
-- **Tính riêng tư**: Toàn bộ dữ liệu của bạn nằm trên máy cá nhân, không lo rò rỉ thông tin lên cloud.
+## 🚀 Why run it on Mac Mini M4?
+- **Apple Silicon Power**: The M4 chip handles AI tasks and vector databases extremely fast and efficiently.
+- **OrbStack**: Superior performance compared to Docker Desktop, launching containers in seconds with minimal resource usage.
+- **Privacy**: All your data stays on your local machine, ensuring no data leaks to the cloud.
 
-## 📋 Yêu cầu
-- Máy Mac chip M1, M2, M3 hoặc M4.
-- Đã cài đặt [OrbStack](https://orbstack.dev/).
-- Quyền Admin để chạy script.
+## 📋 Requirements
+- Mac with M1, M2, M3, or M4 chip.
+- [OrbStack](https://orbstack.dev/) installed.
+- Admin permissions to run the script.
 
-## 🛠️ Hướng dẫn cài đặt
+## 🛠️ Installation Guide
 
-Bạn chỉ cần mở Terminal và chạy lệnh sau:
+Open your Terminal and run the following command:
 
 ```bash
 curl -O https://raw.githubusercontent.com/duynghien/auto/main/lobehub-mac/setup.sh
@@ -22,23 +22,23 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
-## ⚙️ Cấu hình sau cài đặt
+## ⚙️ Post-Installation Configuration
 
-Script cài đặt mọi thứ vào thư mục `~/lobehub-mac`.
+The script installs everything in the `~/lobehub-mac` directory.
 
-### 1. Thêm API Keys
-1. Mở file `.env`: `nano ~/lobehub-mac/.env`
-2. Điền API Key của bạn (ví dụ: `OPENAI_API_KEY=sk-xxxx`).
-3. Khởi động lại service:
+### 1. Add API Keys
+1. Open the `.env` file: `nano ~/lobehub-mac/.env`
+2. Fill in your API Key (e.g., `OPENAI_API_KEY=sk-xxxx`).
+3. Restart the service:
    ```bash
    cd ~/lobehub-mac
    docker compose restart lobe
    ```
 
-### 2. Truy cập
-- **LobeHub**: `http://<IP-CUA-MAC>:3210`
-- **RustFS Console**: `http://<IP-CUA-MAC>:9001`
+### 2. Access
+- **LobeHub**: `http://<YOUR_MAC_IP>:3210`
+- **RustFS Console**: `http://<YOUR_MAC_IP>:9001`
 
-## 🤝 Hỗ trợ
+## 🤝 Support
 - Website: [ai.vnrom.net](https://ai.vnrom.net)
 - User: **duynghien**
