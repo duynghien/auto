@@ -39,4 +39,4 @@ Sau khi cài đặt xong, bạn có thể truy cập Portainer qua trình duyệ
 
 ## 🤝 Hỗ trợ
 - Website: [ai.vnrom.net](https://ai.vnrom.net)
-- Tác giả: **duynghien**
+- User: **duynghien**

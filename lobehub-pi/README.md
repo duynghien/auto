@@ -54,5 +54,5 @@ Mặc định script chưa có API Key của các nhà cung cấp (OpenAI, Anthr
 
 ## 🤝 Hỗ trợ
 - Website: [ai.vnrom.net](https://ai.vnrom.net)
-- Tác giả: **duynghien**
+- User: **duynghien**
 - Phiên bản script: 5.3

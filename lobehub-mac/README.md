@@ -41,4 +41,4 @@ Script cài đặt mọi thứ vào thư mục `~/lobehub-mac`.
 
 ## 🤝 Hỗ trợ
 - Website: [ai.vnrom.net](https://ai.vnrom.net)
-- Tác giả: **duynghien**
+- User: **duynghien**

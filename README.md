@@ -39,7 +39,7 @@ Sau đó, di chuyển vào từng thư mục tương ứng để chạy script c
 
 ## 🤝 Liên hệ & Hỗ trợ
 - **Website**: [ai.vnrom.net](https://ai.vnrom.net)
-- **Tác giả**: **duynghien**
+- **User**: **duynghien**
 - **Cộng đồng**: Hỗ trợ triển khai các giải pháp AI & Tự động hóa.
 
 ---

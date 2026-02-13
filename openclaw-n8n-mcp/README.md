@@ -55,7 +55,7 @@ Khi script chạy xong, n8n đã hoạt động nhưng dịch vụ MCP cần API
 
 ## 🤝 Hỗ trợ
 - Website: [https://ai.vnrom.net](https://ai.vnrom.net)
-- Thương hiệu: **duynghien**
+- User: **duynghien**
 
 ## 📜 Credits
 This project architecture and setup scripts are inspired by [openclaw-n8n-starter](https://github.com/Barty-Bart/openclaw-n8n-starter).
