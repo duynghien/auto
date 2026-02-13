@@ -38,29 +38,243 @@ pheader() {
     echo "================================================================${NC}"
 }
 
-# Start
+# ========================================
+# Language Selection / Chọn ngôn ngữ
+# ========================================
 clear
 pheader
 
-echo "[1/10] Kiểm tra hệ thống Mac"
+echo ""
+echo "  Select language / Chọn ngôn ngữ:"
+echo ""
+echo "    1) English (default)"
+echo "    2) Tiếng Việt"
+echo ""
+read -p "  Enter 1 or 2 [1]: " LANG_CHOICE
+LANG_CHOICE=${LANG_CHOICE:-1}
+
+if [[ "$LANG_CHOICE" == "2" ]]; then
+    LANG="vi"
+else
+    LANG="en"
+fi
+
+# ========================================
+# i18n: All translatable strings
+# ========================================
+t() {
+    local key="$1"
+    shift
+    local text=""
+
+    case "$key" in
+        # Step titles
+        step1)
+            [[ "$LANG" == "vi" ]] && text="[1/10] Kiểm tra hệ thống Mac" || text="[1/10] Checking Mac system";;
+        step2)
+            [[ "$LANG" == "vi" ]] && text="[2/10] Khởi tạo thư mục" || text="[2/10] Creating directory";;
+        step3)
+            [[ "$LANG" == "vi" ]] && text="[3/10] Sinh Secrets (lưu vào .env)" || text="[3/10] Generating Secrets (saving to .env)";;
+        step4)
+            [[ "$LANG" == "vi" ]] && text="[4/10] Chọn S3 Storage" || text="[4/10] Choose S3 Storage";;
+        step5)
+            [[ "$LANG" == "vi" ]] && text="[5/10] Lưu cấu hình .env" || text="[5/10] Saving .env config";;
+        step6)
+            [[ "$LANG" == "vi" ]] && text="[6/10] Tạo file cấu hình" || text="[6/10] Creating config files";;
+        step7)
+            [[ "$LANG" == "vi" ]] && text="[7/10] Tạo Docker Compose" || text="[7/10] Creating Docker Compose";;
+        step8)
+            [[ "$LANG" == "vi" ]] && text="[8/10] Khởi động Container ($1)" || text="[8/10] Starting Containers ($1)";;
+        step9)
+            [[ "$LANG" == "vi" ]] && text="[9/10] Kiểm tra services" || text="[9/10] Verifying services";;
+        step10)
+            [[ "$LANG" == "vi" ]] && text="[10/10] Hoàn tất" || text="[10/10] Finishing up";;
+
+        # Step 1: System check
+        err_macos)
+            [[ "$LANG" == "vi" ]] && text="Script chỉ dành cho macOS!" || text="This script is for macOS only!";;
+        warn_not_apple_silicon)
+            [[ "$LANG" == "vi" ]] && text="Không phải Apple Silicon, hiệu năng sẽ ảnh hưởng" || text="Not Apple Silicon, performance may be affected";;
+        ok_apple_silicon)
+            [[ "$LANG" == "vi" ]] && text="Kiến trúc: Apple Silicon ARM64 (M1/M2/M3/M4)" || text="Architecture: Apple Silicon ARM64 (M1/M2/M3/M4)";;
+        err_docker)
+            [[ "$LANG" == "vi" ]] && text="Docker chưa cài đặt!" || text="Docker is not installed!";;
+        err_docker_dl)
+            [[ "$LANG" == "vi" ]] && text="Tải: https://orbstack.dev hoặc https://docker.com" || text="Download: https://orbstack.dev or https://docker.com";;
+        warn_docker_desktop)
+            [[ "$LANG" == "vi" ]] && text="Docker Desktop có thể chưa chạy" || text="Docker Desktop may not be running";;
+        err_compose)
+            [[ "$LANG" == "vi" ]] && text="Docker Compose Plugin chưa cài đặt!" || text="Docker Compose Plugin is not installed!";;
+        err_missing)
+            [[ "$LANG" == "vi" ]] && text="Thiếu: $1" || text="Missing: $1";;
+
+        # Step 2: Directory
+        ok_dir)
+            [[ "$LANG" == "vi" ]] && text="Thư mục: $1" || text="Directory: $1";;
+
+        # Step 3: Secrets
+        warn_env_found)
+            [[ "$LANG" == "vi" ]] && text="Tìm thấy .env cũ, giữ nguyên secrets..." || text="Found existing .env, preserving secrets...";;
+        ok_jwks)
+            [[ "$LANG" == "vi" ]] && text="Tạo JWKS RSA Key..." || text="Generating JWKS RSA Key...";;
+
+        # Step 4: S3 choice
+        s3_option1)
+            [[ "$LANG" == "vi" ]] && text="  1) RustFS (mặc định LobeHub, nhẹ, nhanh)" || text="  1) RustFS (LobeHub default, lightweight, fast)";;
+        s3_option2)
+            [[ "$LANG" == "vi" ]] && text="  2) MinIO  (truyền thống, ổn định)" || text="  2) MinIO  (traditional, stable)";;
+        s3_prompt)
+            [[ "$LANG" == "vi" ]] && text="Nhập 1 hoặc 2 [1]: " || text="Enter 1 or 2 [1]: ";;
+        ok_s3_choice)
+            [[ "$LANG" == "vi" ]] && text="Chọn: $1" || text="Selected: $1";;
+
+        # Step 5: Save .env
+        env_warning)
+            [[ "$LANG" == "vi" ]] && text="# ⚠️  KHÔNG chia sẻ file này! Chứa thông tin nhạy cảm" || text="# ⚠️  DO NOT share this file! Contains sensitive information";;
+        ok_env_saved)
+            [[ "$LANG" == "vi" ]] && text="Config đã lưu vào .env" || text="Config saved to .env";;
+
+        # Step 6: Config files
+        ok_searxng_dl)
+            [[ "$LANG" == "vi" ]] && text="Tải searxng-settings.yml từ LobeHub official..." || text="Downloading searxng-settings.yml from LobeHub official...";;
+        warn_searxng_fallback)
+            [[ "$LANG" == "vi" ]] && text="Không tải được từ GitHub, tạo config mặc định..." || text="Failed to download from GitHub, creating default config...";;
+
+        # Step 8: Start services
+        ok_stop_old)
+            [[ "$LANG" == "vi" ]] && text="Dừng containers cũ (nếu có)..." || text="Stopping old containers (if any)...";;
+        ok_pull)
+            [[ "$LANG" == "vi" ]] && text="Tải Docker images (lần đầu sẽ lâu)..." || text="Pulling Docker images (first time may take a while)...";;
+        ok_start_infra)
+            [[ "$LANG" == "vi" ]] && text="Khởi động PostgreSQL, Redis & SearXNG..." || text="Starting PostgreSQL, Redis & SearXNG...";;
+        ok_wait_pg)
+            [[ "$LANG" == "vi" ]] && text="Đang chờ PostgreSQL (ParadeDB)..." || text="Waiting for PostgreSQL (ParadeDB)...";;
+        ok_pg_ready)
+            [[ "$LANG" == "vi" ]] && text="PostgreSQL (ParadeDB): sẵn sàng!" || text="PostgreSQL (ParadeDB): ready!";;
+        err_pg)
+            [[ "$LANG" == "vi" ]] && text="PostgreSQL không khởi động được!" || text="PostgreSQL failed to start!";;
+        ok_wait_redis)
+            [[ "$LANG" == "vi" ]] && text="Đang chờ Redis..." || text="Waiting for Redis...";;
+        ok_redis_ready)
+            [[ "$LANG" == "vi" ]] && text="Redis: sẵn sàng!" || text="Redis: ready!";;
+        err_redis)
+            [[ "$LANG" == "vi" ]] && text="Redis không khởi động được!" || text="Redis failed to start!";;
+        ok_start_rustfs)
+            [[ "$LANG" == "vi" ]] && text="Khởi động RustFS..." || text="Starting RustFS...";;
+        ok_wait_rustfs)
+            [[ "$LANG" == "vi" ]] && text="Đang chờ RustFS..." || text="Waiting for RustFS...";;
+        ok_rustfs_ready)
+            [[ "$LANG" == "vi" ]] && text="RustFS: sẵn sàng!" || text="RustFS: ready!";;
+        err_rustfs)
+            [[ "$LANG" == "vi" ]] && text="RustFS không khởi động được!" || text="RustFS failed to start!";;
+        ok_start_minio)
+            [[ "$LANG" == "vi" ]] && text="Khởi động MinIO..." || text="Starting MinIO...";;
+        ok_wait_minio)
+            [[ "$LANG" == "vi" ]] && text="Đang chờ MinIO..." || text="Waiting for MinIO...";;
+        ok_minio_ready)
+            [[ "$LANG" == "vi" ]] && text="MinIO: sẵn sàng!" || text="MinIO: ready!";;
+        err_minio)
+            [[ "$LANG" == "vi" ]] && text="MinIO không khởi động được!" || text="MinIO failed to start!";;
+        ok_init_bucket)
+            [[ "$LANG" == "vi" ]] && text="Khởi tạo S3 bucket..." || text="Initializing S3 bucket...";;
+        ok_start_lobe)
+            [[ "$LANG" == "vi" ]] && text="Khởi động LobeHub..." || text="Starting LobeHub...";;
+        ok_wait_lobe)
+            [[ "$LANG" == "vi" ]] && text="Đang chờ LobeHub khởi động..." || text="Waiting for LobeHub to start...";;
+        ok_lobe_ready)
+            [[ "$LANG" == "vi" ]] && text="LobeHub: sẵn sàng!" || text="LobeHub: ready!";;
+        warn_lobe_slow)
+            [[ "$LANG" == "vi" ]] && text="LobeHub cần thêm thời gian khởi động" || text="LobeHub needs more time to start";;
+
+        # Step 9: Verify
+        err_pg_verify)
+            [[ "$LANG" == "vi" ]] && text="PostgreSQL: LỖI" || text="PostgreSQL: ERROR";;
+        err_redis_verify)
+            [[ "$LANG" == "vi" ]] && text="Redis: LỖI" || text="Redis: ERROR";;
+        err_rustfs_verify)
+            [[ "$LANG" == "vi" ]] && text="RustFS: LỖI" || text="RustFS: ERROR";;
+        err_minio_verify)
+            [[ "$LANG" == "vi" ]] && text="MinIO: LỖI" || text="MinIO: ERROR";;
+        err_searxng_verify)
+            [[ "$LANG" == "vi" ]] && text="SearXNG: LỖI (search sẽ không hoạt động)" || text="SearXNG: ERROR (search will not work)";;
+
+        # Step 10: Finish
+        finish_ok)
+            [[ "$LANG" == "vi" ]] && text="🎉 CÀI ĐẶT HOÀN TẤT!" || text="🎉 INSTALLATION COMPLETE!";;
+        finish_warn)
+            [[ "$LANG" == "vi" ]] && text="⚠️  CÀI ĐẶT XONG (có service chưa sẵn sàng)" || text="⚠️  INSTALLATION DONE (some services not ready)";;
+        features_title)
+            [[ "$LANG" == "vi" ]] && text="✨ Tính năng đã bật:" || text="✨ Enabled features:";;
+        feat_kb)
+            [[ "$LANG" == "vi" ]] && text="  ✓ Knowledge Base (ParadeDB: pgvector + pg_search)" || text="  ✓ Knowledge Base (ParadeDB: pgvector + pg_search)";;
+        feat_upload)
+            [[ "$LANG" == "vi" ]] && text="  ✓ Upload files & photos (S3 + proxy)" || text="  ✓ Upload files & photos (S3 + proxy)";;
+        feat_search)
+            [[ "$LANG" == "vi" ]] && text="  ✓ Online Search (SearXNG - self-hosted)" || text="  ✓ Online Search (SearXNG - self-hosted)";;
+        feat_artifacts)
+            [[ "$LANG" == "vi" ]] && text="  ✓ Artifacts (SVG, HTML, code rendering)" || text="  ✓ Artifacts (SVG, HTML, code rendering)";;
+        feat_vision)
+            [[ "$LANG" == "vi" ]] && text="  ✓ Image Vision (LLM đọc ảnh upload)" || text="  ✓ Image Vision (LLM reads uploaded images)";;
+        feat_memory)
+            [[ "$LANG" == "vi" ]] && text="  ✓ Memory & Chat History (server-side DB)" || text="  ✓ Memory & Chat History (server-side DB)";;
+        feat_crawl)
+            [[ "$LANG" == "vi" ]] && text="  ✓ Web Crawling (naive crawler)" || text="  ✓ Web Crawling (naive crawler)";;
+        important_title)
+            [[ "$LANG" == "vi" ]] && text="⚠️  QUAN TRỌNG:" || text="⚠️  IMPORTANT:";;
+        important_env)
+            [[ "$LANG" == "vi" ]] && text="  • File .env chứa secrets - KHÔNG chia sẻ!" || text="  • The .env file contains secrets - DO NOT share!";;
+        important_path)
+            [[ "$LANG" == "vi" ]] && text="  • Đường dẫn: $1" || text="  • Path: $1";;
+        usage_title)
+            [[ "$LANG" == "vi" ]] && text="Bắt đầu sử dụng:" || text="Getting started:";;
+        usage_1)
+            [[ "$LANG" == "vi" ]] && text="  1. Truy cập: http://localhost:3210" || text="  1. Open: http://localhost:3210";;
+        usage_2)
+            [[ "$LANG" == "vi" ]] && text="  2. Thêm API Key (OpenAI/Claude/Gemini) trong Settings" || text="  2. Add API Key (OpenAI/Claude/Gemini) in Settings";;
+        usage_3)
+            [[ "$LANG" == "vi" ]] && text="  3. Bật 'Smart Search' để test Online Search" || text="  3. Enable 'Smart Search' to test Online Search";;
+        usage_4)
+            [[ "$LANG" == "vi" ]] && text="  4. Upload file để test Knowledge Base" || text="  4. Upload a file to test Knowledge Base";;
+        manage_title)
+            [[ "$LANG" == "vi" ]] && text="Quản lý:" || text="Management:";;
+        notes_title)
+            [[ "$LANG" == "vi" ]] && text="📝 Ghi chú:" || text="📝 Notes:";;
+        note_1)
+            [[ "$LANG" == "vi" ]] && text="  • Sử dụng ./lobe.sh để quản lý thay vì docker compose trực tiếp" || text="  • Use ./lobe.sh to manage instead of docker compose directly";;
+        note_2)
+            [[ "$LANG" == "vi" ]] && text="  • Secrets được lưu trong .env - backup file này nếu cần!" || text="  • Secrets are stored in .env - back up this file if needed!";;
+        note_3)
+            [[ "$LANG" == "vi" ]] && text="  • Test search: ./lobe.sh search-test 'thời tiết hôm nay'" || text="  • Test search: ./lobe.sh search-test 'weather today'";;
+        *)
+            text="[MISSING: $key]";;
+    esac
+
+    echo "$text"
+}
+
+# ========================================
+# Step 1: System Check
+# ========================================
+echo ""
+echo "$(t step1)"
 
 # Check macOS
 if [[ "$(uname)" != "Darwin" ]]; then
-    perr "Script chỉ dành cho macOS!"
+    perr "$(t err_macos)"
     exit 1
 fi
 
 # Check Apple Silicon
 if [[ "$(uname -m)" != "arm64" ]]; then
-    pwn "Không phải Apple Silicon, hiệu năng sẽ ảnh hưởng"
+    pwn "$(t warn_not_apple_silicon)"
 else
-    pok "Kiến trúc: Apple Silicon ARM64 (M1/M2/M3/M4)"
+    pok "$(t ok_apple_silicon)"
 fi
 
 # Check Docker (OrbStack or Docker Desktop)
 if ! command -v docker &> /dev/null; then
-    perr "Docker chưa cài đặt!"
-    perr "Tải: https://orbstack.dev hoặc https://docker.com"
+    perr "$(t err_docker)"
+    perr "$(t err_docker_dl)"
     exit 1
 fi
 
@@ -70,12 +284,12 @@ if command -v orb &> /dev/null; then
 elif docker context ls 2>/dev/null | grep -q orbstack; then
     pok "OrbStack (context): OK"
 else
-    pwn "Docker Desktop có thể chưa chạy"
+    pwn "$(t warn_docker_desktop)"
 fi
 
 # Check Docker Compose
 if ! docker compose version &> /dev/null; then
-    perr "Docker Compose Plugin chưa cài đặt!"
+    perr "$(t err_compose)"
     exit 1
 fi
 pok "Docker Compose: OK"
@@ -83,7 +297,7 @@ pok "Docker Compose: OK"
 # Dependencies
 for c in openssl python3 curl; do
     if ! command -v $c &> /dev/null; then
-        perr "Thiếu: $c"
+        perr "$(t err_missing "$c")"
         exit 1
     fi
 done
@@ -93,22 +307,22 @@ pok "Dependencies: OK"
 # Step 2: Directory
 # ========================================
 echo ""
-echo "[2/10] Khởi tạo thư mục"
+echo "$(t step2)"
 
 INSTALL_DIR="$HOME/lobehub-mac"
 mkdir -p "$INSTALL_DIR"
 cd "$INSTALL_DIR"
-pok "Thư mục: $INSTALL_DIR"
+pok "$(t ok_dir "$INSTALL_DIR")"
 
 # ========================================
 # Step 3: Generate Secrets & Save to .env
 # ========================================
 echo ""
-echo "[3/10] Sinh Secrets (lưu vào .env)"
+echo "$(t step3)"
 
 # Preserve existing secrets if .env exists
 if [ -f .env ]; then
-    pwn "Tìm thấy .env cũ, giữ nguyên secrets..."
+    pwn "$(t warn_env_found)"
     source .env 2>/dev/null || true
 fi
 
@@ -125,7 +339,7 @@ S3_SECRET_KEY="${RUSTFS_SECRET_KEY}"
 
 # Generate JWKS
 if [ -z "${JWKS_KEY:-}" ]; then
-    pok "Tạo JWKS RSA Key..."
+    pok "$(t ok_jwks)"
     TMP_PEM=$(mktemp)
     openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$TMP_PEM" 2>/dev/null
 
@@ -175,12 +389,12 @@ pok "Secrets: OK"
 # Step 4: Choose S3 Storage
 # ========================================
 echo ""
-echo "[4/10] Chọn S3 Storage"
+echo "$(t step4)"
 echo ""
-echo "  1) RustFS (mặc định LobeHub, nhẹ, nhanh)"
-echo "  2) MinIO  (truyền thống, ổn định)"
+echo "$(t s3_option1)"
+echo "$(t s3_option2)"
 echo ""
-read -p "Nhập 1 hoặc 2 [1]: " S3_CHOICE
+read -p "$(t s3_prompt)" S3_CHOICE
 
 S3_CHOICE=${S3_CHOICE:-1}
 
@@ -192,18 +406,18 @@ else
     S3_SERVICE_NAME="RustFS"
 fi
 
-pok "Chọn: $S3_SERVICE_NAME"
+pok "$(t ok_s3_choice "$S3_SERVICE_NAME")"
 
 # ========================================
 # Step 5: Save .env
 # ========================================
 echo ""
-echo "[5/10] Lưu cấu hình .env"
+echo "$(t step5)"
 
 cat > .env << ENVEOF
 # =================================================================
 # LobeHub v3.0 - Configuration & Secrets
-# ⚠️  KHÔNG chia sẻ file này! Chứa thông tin nhạy cảm
+$(t env_warning)
 # Generated: $(date '+%Y-%m-%d %H:%M:%S')
 # =================================================================
 
@@ -235,13 +449,13 @@ RUSTFS_LOBE_BUCKET=lobe
 S3_SERVICE=$S3_SERVICE
 ENVEOF
 
-pok "Config đã lưu vào .env"
+pok "$(t ok_env_saved)"
 
 # ========================================
 # Step 6: Configuration Files
 # ========================================
 echo ""
-echo "[6/10] Tạo file cấu hình"
+echo "$(t step6)"
 
 # Bucket policy - READ ONLY public (compatible with both MinIO and RustFS)
 cat > bucket.config.json << 'BUCKETEOF'
@@ -261,12 +475,12 @@ BUCKETEOF
 pok "bucket.config.json: OK (read-only public)"
 
 # SearXNG Settings - download official config from LobeHub repo
-pok "Tải searxng-settings.yml từ LobeHub official..."
+pok "$(t ok_searxng_dl)"
 SEARXNG_URL="https://raw.githubusercontent.com/lobehub/lobe-chat/HEAD/docker-compose/deploy/searxng-settings.yml"
 if curl -sfL "$SEARXNG_URL" -o searxng-settings.yml; then
     pok "searxng-settings.yml: OK (official LobeHub config)"
 else
-    pwn "Không tải được từ GitHub, tạo config mặc định..."
+    pwn "$(t warn_searxng_fallback)"
     # Fallback: generate minimal valid config
     cat > searxng-settings.yml << SEARXNGEOF
 use_default_settings: true
@@ -297,7 +511,7 @@ fi
 # Step 7: Create Docker Compose
 # ========================================
 echo ""
-echo "[7/10] Tạo Docker Compose"
+echo "$(t step7)"
 
 if [[ "$S3_SERVICE" == "rustfs" ]]; then
 # ---- RustFS Docker Compose ----
@@ -608,89 +822,89 @@ pok "Docker Compose: OK ($S3_SERVICE_NAME + SearXNG)"
 # Step 8: Start Services
 # ========================================
 echo ""
-echo "[8/10] Khởi động Container ($S3_SERVICE_NAME + SearXNG)"
+echo "$(t step8 "$S3_SERVICE_NAME + SearXNG")"
 
 cd "$INSTALL_DIR"
 
 # Stop any existing containers
-pok "Dừng containers cũ (nếu có)..."
+pok "$(t ok_stop_old)"
 docker compose down 2>/dev/null || true
 
 # Pull images
-pok "Tải Docker images (lần đầu sẽ lâu)..."
+pok "$(t ok_pull)"
 docker compose pull
 
 # Start infrastructure first
-pok "Khởi động PostgreSQL, Redis & SearXNG..."
+pok "$(t ok_start_infra)"
 docker compose up -d network-service postgresql redis searxng
 
 # Wait for PostgreSQL
-pok "Đang chờ PostgreSQL (ParadeDB)..."
+pok "$(t ok_wait_pg)"
 for i in {1..60}; do
     if docker exec lobe-mac-postgres pg_isready -U postgres &>/dev/null; then
-        pok "PostgreSQL (ParadeDB): sẵn sàng!"
+        pok "$(t ok_pg_ready)"
         break
     fi
-    [ $i -eq 60 ] && { perr "PostgreSQL không khởi động được!"; exit 1; }
+    [ $i -eq 60 ] && { perr "$(t err_pg)"; exit 1; }
     sleep 2
 done
 
 # Wait for Redis
-pok "Đang chờ Redis..."
+pok "$(t ok_wait_redis)"
 for i in {1..30}; do
     if docker exec lobe-mac-redis redis-cli ping &>/dev/null; then
-        pok "Redis: sẵn sàng!"
+        pok "$(t ok_redis_ready)"
         break
     fi
-    [ $i -eq 30 ] && { perr "Redis không khởi động được!"; exit 1; }
+    [ $i -eq 30 ] && { perr "$(t err_redis)"; exit 1; }
     sleep 2
 done
 
 # Start S3 Storage
 if [[ "$S3_SERVICE" == "rustfs" ]]; then
-    pok "Khởi động RustFS..."
+    pok "$(t ok_start_rustfs)"
     docker compose up -d rustfs
-    pok "Đang chờ RustFS..."
+    pok "$(t ok_wait_rustfs)"
     for i in {1..60}; do
         if curl -sf http://localhost:9000/health &>/dev/null; then
-            pok "RustFS: sẵn sàng!"
+            pok "$(t ok_rustfs_ready)"
             break
         fi
-        [ $i -eq 60 ] && { perr "RustFS không khởi động được!"; exit 1; }
+        [ $i -eq 60 ] && { perr "$(t err_rustfs)"; exit 1; }
         sleep 2
     done
     # Init bucket
-    pok "Khởi tạo S3 bucket..."
+    pok "$(t ok_init_bucket)"
     docker compose up rustfs-init
 else
-    pok "Khởi động MinIO..."
+    pok "$(t ok_start_minio)"
     docker compose up -d minio
-    pok "Đang chờ MinIO..."
+    pok "$(t ok_wait_minio)"
     for i in {1..60}; do
         if curl -sf http://localhost:9000/minio/health/live &>/dev/null; then
-            pok "MinIO: sẵn sàng!"
+            pok "$(t ok_minio_ready)"
             break
         fi
-        [ $i -eq 60 ] && { perr "MinIO không khởi động được!"; exit 1; }
+        [ $i -eq 60 ] && { perr "$(t err_minio)"; exit 1; }
         sleep 2
     done
     # Init bucket
-    pok "Khởi tạo S3 bucket..."
+    pok "$(t ok_init_bucket)"
     docker compose up minio-init
 fi
 
 # Start LobeHub
-pok "Khởi động LobeHub..."
+pok "$(t ok_start_lobe)"
 docker compose up -d lobe
 
 # Wait for LobeHub
-pok "Đang chờ LobeHub khởi động..."
+pok "$(t ok_wait_lobe)"
 for i in {1..120}; do
     if curl -sf http://localhost:3210 >/dev/null 2>&1; then
-        pok "LobeHub: sẵn sàng!"
+        pok "$(t ok_lobe_ready)"
         break
     fi
-    [ $i -eq 120 ] && pwn "LobeHub cần thêm thời gian khởi động"
+    [ $i -eq 120 ] && pwn "$(t warn_lobe_slow)"
     sleep 2
 done
 
@@ -698,17 +912,17 @@ done
 # Step 9: Verify Services
 # ========================================
 echo ""
-echo "[9/10] Kiểm tra services"
+echo "$(t step9)"
 
 ALL_OK=true
 
-docker exec lobe-mac-postgres pg_isready -U postgres &>/dev/null && pok "PostgreSQL (ParadeDB): OK" || { perr "PostgreSQL: LỖI"; ALL_OK=false; }
-docker exec lobe-mac-redis redis-cli ping &>/dev/null && pok "Redis: OK" || { perr "Redis: LỖI"; ALL_OK=false; }
+docker exec lobe-mac-postgres pg_isready -U postgres &>/dev/null && pok "PostgreSQL (ParadeDB): OK" || { perr "$(t err_pg_verify)"; ALL_OK=false; }
+docker exec lobe-mac-redis redis-cli ping &>/dev/null && pok "Redis: OK" || { perr "$(t err_redis_verify)"; ALL_OK=false; }
 
 if [[ "$S3_SERVICE" == "rustfs" ]]; then
-    curl -sf http://localhost:9000/health &>/dev/null && pok "RustFS: OK" || { perr "RustFS: LỖI"; ALL_OK=false; }
+    curl -sf http://localhost:9000/health &>/dev/null && pok "RustFS: OK" || { perr "$(t err_rustfs_verify)"; ALL_OK=false; }
 else
-    curl -sf http://localhost:9000/minio/health/live &>/dev/null && pok "MinIO: OK" || { perr "MinIO: LỖI"; ALL_OK=false; }
+    curl -sf http://localhost:9000/minio/health/live &>/dev/null && pok "MinIO: OK" || { perr "$(t err_minio_verify)"; ALL_OK=false; }
 fi
 
 # Test SearXNG
@@ -722,17 +936,17 @@ for i in {1..10}; do
     sleep 2
 done
 if [ "$SEARXNG_OK" = false ]; then
-    perr "SearXNG: LỖI (search sẽ không hoạt động)"
+    perr "$(t err_searxng_verify)"
     ALL_OK=false
 fi
 
-curl -sf http://localhost:3210 >/dev/null && pok "LobeHub: OK" || { perr "LobeHub: LỖI"; ALL_OK=false; }
+curl -sf http://localhost:3210 >/dev/null && pok "LobeHub: OK" || { perr "LobeHub: ERROR"; ALL_OK=false; }
 
 # ========================================
 # Step 10: Create Helper Script & Finish
 # ========================================
 echo ""
-echo "[10/10] Hoàn tất"
+echo "$(t step10)"
 
 # Create helper script
 cat > lobe.sh << 'SCRIPTEOF'
@@ -781,14 +995,14 @@ case "$1" in
     fi
     ;;
   reset)
-    echo "⚠️  Xóa TẤT CẢ data (database, uploads, secrets)..."
-    read -p "Nhập 'yes' để xác nhận: " confirm
+    echo "⚠️  This will DELETE ALL data (database, uploads, secrets)..."
+    read -p "Type 'yes' to confirm: " confirm
     if [[ "$confirm" == "yes" ]]; then
       docker compose down -v
       rm -rf ./data
-      echo "✅ Đã xóa tất cả!"
+      echo "✅ All data deleted!"
     else
-      echo "❌ Hủy bỏ."
+      echo "❌ Cancelled."
     fi
     ;;
   secrets)
@@ -829,9 +1043,9 @@ pok "Helper script: lobe.sh created!"
 echo ""
 echo "========================================================"
 if [ "$ALL_OK" = true ]; then
-    echo -e "${GREEN}  🎉 CÀI ĐẶT HOÀN TẤT!${NC}"
+    echo -e "${GREEN}  $(t finish_ok)${NC}"
 else
-    echo -e "${YELLOW}  ⚠️  CÀI ĐẶT XONG (có service chưa sẵn sàng)${NC}"
+    echo -e "${YELLOW}  $(t finish_warn)${NC}"
 fi
 echo ""
 echo -e "  LobeHub:          ${PURPLE}http://localhost:3210${NC}"
@@ -839,27 +1053,27 @@ echo -e "  S3 Console:       ${PURPLE}http://localhost:9001${NC}"
 echo -e "  S3 User:          $RUSTFS_ACCESS_KEY"
 echo -e "  S3 Pass:          $RUSTFS_SECRET_KEY"
 echo ""
-echo -e "${CYAN}✨ Tính năng đã bật:${NC}"
-echo "  ✓ Knowledge Base (ParadeDB: pgvector + pg_search)"
-echo "  ✓ Upload files & photos (S3 + proxy)"
-echo "  ✓ Online Search (SearXNG - self-hosted)"
-echo "  ✓ Artifacts (SVG, HTML, code rendering)"
-echo "  ✓ Image Vision (LLM đọc ảnh upload)"
-echo "  ✓ Memory & Chat History (server-side DB)"
-echo "  ✓ Web Crawling (naive crawler)"
+echo -e "${CYAN}$(t features_title)${NC}"
+echo "$(t feat_kb)"
+echo "$(t feat_upload)"
+echo "$(t feat_search)"
+echo "$(t feat_artifacts)"
+echo "$(t feat_vision)"
+echo "$(t feat_memory)"
+echo "$(t feat_crawl)"
 echo ""
-echo -e "${YELLOW}⚠️  QUAN TRỌNG:${NC}"
-echo "  • File .env chứa secrets - KHÔNG chia sẻ!"
-echo "  • Đường dẫn: $INSTALL_DIR/.env"
+echo -e "${YELLOW}$(t important_title)${NC}"
+echo "$(t important_env)"
+echo "$(t important_path "$INSTALL_DIR/.env")"
 echo ""
-echo -e "${CYAN}Bắt đầu sử dụng:${NC}"
-echo "  1. Truy cập: http://localhost:3210"
-echo "  2. Thêm API Key (OpenAI/Claude/Gemini) trong Settings"
-echo "  3. Bật 'Smart Search' để test Online Search"
-echo "  4. Upload file để test Knowledge Base"
+echo -e "${CYAN}$(t usage_title)${NC}"
+echo "$(t usage_1)"
+echo "$(t usage_2)"
+echo "$(t usage_3)"
+echo "$(t usage_4)"
 echo ""
-echo -e "${CYAN}Quản lý:${NC}"
-echo "  • Xem logs:      ./lobe.sh logs"
+echo -e "${CYAN}$(t manage_title)${NC}"
+echo "  • Logs:           ./lobe.sh logs"
 echo "  • Restart:        ./lobe.sh restart"
 echo "  • Upgrade:        ./lobe.sh upgrade"
 echo "  • Stop:           ./lobe.sh stop"
@@ -867,9 +1081,9 @@ echo "  • Start:          ./lobe.sh start"
 echo "  • Test search:    ./lobe.sh search-test"
 echo "  • Full reset:     ./lobe.sh reset"
 echo ""
-echo "Support: https://ai.vnrom.net"
+echo "Support: https://vnrom.net"
 echo ""
-echo "📝 Ghi chú:"
-echo "  • Sử dụng ./lobe.sh để quản lý thay vì docker compose trực tiếp"
-echo "  • Secrets được lưu trong .env - backup file này nếu cần!"
-echo "  • Test search: ./lobe.sh search-test 'thời tiết hôm nay'"
+echo "$(t notes_title)"
+echo "$(t note_1)"
+echo "$(t note_2)"
+echo "$(t note_3)"
