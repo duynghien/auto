@@ -60,6 +60,76 @@ else
 fi
 
 # ========================================
+# Network Mode Selection
+# ========================================
+
+# Auto-detect LAN IP
+LAN_IP=$(ipconfig getifaddr en0 2>/dev/null || echo "")
+[ -z "$LAN_IP" ] && LAN_IP=$(ipconfig getifaddr en1 2>/dev/null || echo "")
+[ -z "$LAN_IP" ] && LAN_IP=$(ifconfig | grep 'inet ' | grep -v '127.0.0.1' | head -1 | awk '{print $2}' || echo "")
+
+echo ""
+if [[ "$LANG" == "vi" ]]; then
+    echo "  Chế độ truy cập:"
+    echo ""
+    echo "    1) Localhost (chỉ truy cập từ máy này - mặc định)"
+    if [ -n "$LAN_IP" ]; then
+        echo "    2) LAN / Home Server (truy cập từ các thiết bị khác: $LAN_IP)"
+    else
+        echo "    2) LAN / Home Server (nhập IP thủ công)"
+    fi
+else
+    echo "  Access mode:"
+    echo ""
+    echo "    1) Localhost only (access from this machine - default)"
+    if [ -n "$LAN_IP" ]; then
+        echo "    2) LAN / Home Server (access from other devices: $LAN_IP)"
+    else
+        echo "    2) LAN / Home Server (enter IP manually)"
+    fi
+fi
+echo ""
+read -p "  Enter 1 or 2 [1]: " NET_CHOICE
+NET_CHOICE=${NET_CHOICE:-1}
+
+if [[ "$NET_CHOICE" == "2" ]]; then
+    NETWORK_MODE="lan"
+    if [ -n "$LAN_IP" ]; then
+        if [[ "$LANG" == "vi" ]]; then
+            echo ""
+            read -p "  Sử dụng IP $LAN_IP? (Enter = OK, hoặc nhập IP khác): " CUSTOM_IP
+        else
+            echo ""
+            read -p "  Use IP $LAN_IP? (Enter = OK, or type a different IP): " CUSTOM_IP
+        fi
+        [ -n "$CUSTOM_IP" ] && LAN_IP="$CUSTOM_IP"
+    else
+        if [[ "$LANG" == "vi" ]]; then
+            read -p "  Nhập IP LAN của máy Mac: " LAN_IP
+        else
+            read -p "  Enter the Mac's LAN IP address: " LAN_IP
+        fi
+        if [ -z "$LAN_IP" ]; then
+            perr "IP is required for LAN mode!"
+            exit 1
+        fi
+    fi
+    APP_URL="http://${LAN_IP}:3210"
+    S3_PUBLIC_ENDPOINT="http://${LAN_IP}:9000"
+else
+    NETWORK_MODE="localhost"
+    LAN_IP="localhost"
+    APP_URL="http://localhost:3210"
+    S3_PUBLIC_ENDPOINT="http://localhost:9000"
+fi
+
+if [[ "$LANG" == "vi" ]]; then
+    pok "Chế độ: $( [[ "$NETWORK_MODE" == "lan" ]] && echo "LAN ($LAN_IP)" || echo "Localhost" )"
+else
+    pok "Mode: $( [[ "$NETWORK_MODE" == "lan" ]] && echo "LAN ($LAN_IP)" || echo "Localhost" )"
+fi
+
+# ========================================
 # i18n: All translatable strings
 # ========================================
 t() {
@@ -228,7 +298,7 @@ t() {
         usage_title)
             [[ "$LANG" == "vi" ]] && text="Bắt đầu sử dụng:" || text="Getting started:";;
         usage_1)
-            [[ "$LANG" == "vi" ]] && text="  1. Truy cập: http://localhost:3210" || text="  1. Open: http://localhost:3210";;
+            [[ "$LANG" == "vi" ]] && text="  1. Truy cập: $APP_URL" || text="  1. Open: $APP_URL";;
         usage_2)
             [[ "$LANG" == "vi" ]] && text="  2. Thêm API Key (OpenAI/Claude/Gemini) trong Settings" || text="  2. Add API Key (OpenAI/Claude/Gemini) in Settings";;
         usage_3)
@@ -419,6 +489,7 @@ cat > .env << ENVEOF
 # LobeHub v3.0 - Configuration & Secrets
 $(t env_warning)
 # Generated: $(date '+%Y-%m-%d %H:%M:%S')
+# Network mode: $NETWORK_MODE ($LAN_IP)
 # =================================================================
 
 # ===========================
@@ -426,7 +497,7 @@ $(t env_warning)
 # ===========================
 LOBE_PORT=3210
 RUSTFS_PORT=9000
-APP_URL=http://localhost:3210
+APP_URL=$APP_URL
 
 # Auth Secrets
 AUTH_SECRET=$AUTH_SECRET
@@ -442,7 +513,7 @@ RUSTFS_ACCESS_KEY=$RUSTFS_ACCESS_KEY
 RUSTFS_SECRET_KEY=$RUSTFS_SECRET_KEY
 S3_ACCESS_KEY=$S3_ACCESS_KEY
 S3_SECRET_KEY=$S3_SECRET_KEY
-S3_ENDPOINT=http://localhost:9000
+S3_ENDPOINT=$S3_PUBLIC_ENDPOINT
 RUSTFS_LOBE_BUCKET=lobe
 
 # S3 Storage choice
@@ -721,7 +792,7 @@ services:
     environment:
       - MINIO_ROOT_USER=${S3_ACCESS_KEY}
       - MINIO_ROOT_PASSWORD=${S3_SECRET_KEY}
-      - MINIO_API_CORS_ORIGIN=http://localhost:3210
+      - MINIO_API_CORS_ORIGIN=${APP_URL}
     volumes:
       - minio_data:/data
     command: server --console-address ":9001" /data
@@ -959,7 +1030,8 @@ case "$1" in
   start)
     echo "🚀 Starting LobeHub..."
     docker compose up -d
-    echo "✅ Started! Access: http://localhost:3210"
+    APP=$(grep '^APP_URL=' .env 2>/dev/null | cut -d= -f2- || echo 'http://localhost:3210')
+    echo "✅ Started! Access: $APP"
     ;;
   stop)
     echo "🛑 Stopping LobeHub..."
@@ -1048,10 +1120,24 @@ else
     echo -e "${YELLOW}  $(t finish_warn)${NC}"
 fi
 echo ""
-echo -e "  LobeHub:          ${PURPLE}http://localhost:3210${NC}"
-echo -e "  S3 Console:       ${PURPLE}http://localhost:9001${NC}"
+echo -e "  LobeHub:          ${PURPLE}${APP_URL}${NC}"
+echo -e "  S3 Console:       ${PURPLE}http://${LAN_IP}:9001${NC}"
 echo -e "  S3 User:          $RUSTFS_ACCESS_KEY"
 echo -e "  S3 Pass:          $RUSTFS_SECRET_KEY"
+if [[ "$NETWORK_MODE" == "lan" ]]; then
+    echo ""
+    if [[ "$LANG" == "vi" ]]; then
+        echo -e "${CYAN}🌐 Truy cập LAN:${NC}"
+        echo "  Các thiết bị trong cùng mạng WiFi/LAN có thể truy cập:"
+        echo -e "  LobeHub:  ${PURPLE}${APP_URL}${NC}"
+        echo -e "  S3:       ${PURPLE}http://${LAN_IP}:9001${NC}"
+    else
+        echo -e "${CYAN}🌐 LAN Access:${NC}"
+        echo "  Devices on the same WiFi/LAN network can access:"
+        echo -e "  LobeHub:  ${PURPLE}${APP_URL}${NC}"
+        echo -e "  S3:       ${PURPLE}http://${LAN_IP}:9001${NC}"
+    fi
+fi
 echo ""
 echo -e "${CYAN}$(t features_title)${NC}"
 echo "$(t feat_kb)"
@@ -1065,6 +1151,13 @@ echo ""
 echo -e "${YELLOW}$(t important_title)${NC}"
 echo "$(t important_env)"
 echo "$(t important_path "$INSTALL_DIR/.env")"
+if [[ "$NETWORK_MODE" == "lan" ]]; then
+    if [[ "$LANG" == "vi" ]]; then
+        echo "  • Nếu IP LAN thay đổi, sửa APP_URL trong .env và restart"
+    else
+        echo "  • If your LAN IP changes, update APP_URL in .env and restart"
+    fi
+fi
 echo ""
 echo -e "${CYAN}$(t usage_title)${NC}"
 echo "$(t usage_1)"
