@@ -59,9 +59,16 @@ fi
 
 # Auto-detect IP
 DETECTED_IP=$(curl -s ifconfig.me)
-read -p "Enter your Droplet IP [${DETECTED_IP}]: " DROPLET_IP
-DROPLET_IP=${DROPLET_IP:-$DETECTED_IP}
-DOMAIN_NAME="${DROPLET_IP}.nip.io"
+echo -e "${PURPLE}Domain/IP: Nếu chưa mua tên miền, bạn chỉ cần copy địa chỉ IP và dán vào. Hệ thống sẽ dùng nip.io để tạo tên miền tạm.${NC}"
+read -p "Nhập Tên miền hoặc IP [${DETECTED_IP}]: " USER_INPUT
+USER_INPUT=${USER_INPUT:-$DETECTED_IP}
+
+# Check if input is a raw IP address (v4) to decide whether to use nip.io
+if [[ $USER_INPUT =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    DOMAIN_NAME="${USER_INPUT}.nip.io"
+else
+    DOMAIN_NAME="${USER_INPUT}"
+fi
 
 echo -e "Using domain: ${PURPLE}${DOMAIN_NAME}${NC}"
 
