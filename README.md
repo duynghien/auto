@@ -46,9 +46,9 @@ Then, navigate to the corresponding directory to run the installation script.
 ---
 
 ### 🤝 Contact & Support
-- **Website**: [ai.vnrom.net](https://ai.vnrom.net)
+- **Website**: [vnrom.net](https://vnrom.net)
 - **Author**: [duynghien](https://github.com/duynghien)
-- **Community**: [VN AI Community](https://facebook.com/groups/vnrom) - Support for AI & Automation deployment.
+- **Community**: [AI & Automation (vnROM)](https://ai.vnrom.net) - Support for AI & Automation deployment.
 
 ---
 
@@ -94,9 +94,9 @@ Sau đó, truy cập vào thư mục tương ứng để chạy script cài đ�
 ---
 
 ### 🤝 Liên hệ & Hỗ trợ
-- **Website**: [ai.vnrom.net](https://ai.vnrom.net)
-- **Tác giả**: [duynghien](https://github.com/duynghien)
-- **Cộng đồng**: [VN AI Community](https://facebook.com/groups/vnrom) - Hỗ trợ triển khai AI & Automation.
+- **Website**: [vnrom.net](https://vnrom.net)
+- **Author**: [duynghien](https://github.com/duynghien)
+- **Community**: [AI & Automation (vnROM)](https://ai.vnrom.net) - Hỗ trợ triển khai AI & Automation.
 
 ---
 *Lưu ý: Luôn kiểm tra nội dung script trước khi chạy với quyền root.*

@@ -60,6 +60,13 @@ After installation, use the `~/lobehub-mac/lobe.sh` helper to manage your instan
 
 ---
 
+## 🤝 Support & Community
+- **Website**: [vnrom.net](https://vnrom.net)
+- **Community**: [AI & Automation (vnROM)](https://ai.vnrom.net)
+- **Author**: [duynghien](https://github.com/duynghien)
+
+---
+
 ## Tiếng Việt
 
 Bộ cài đặt tự động LobeHub tối ưu nhất dành cho **macOS (M1/M2/M3/M4)**. Tích hợp đầy đủ các tính năng nâng cao: Knowledge Base, Online Search, S3 Storage và Artifacts.
@@ -117,6 +124,6 @@ Sau khi cài đặt, bạn sẽ sử dụng file `~/lobehub-mac/lobe.sh` để q
 ---
 
 ## 🤝 Support & Community
-- **Website**: [ai.vnrom.net](https://ai.vnrom.net)
-- **Group**: [VN AI Community](https://facebook.com/groups/vnrom)
+- **Website**: [vnrom.net](https://vnrom.net)
+- **Community**: [AI & Automation (vnROM)](https://ai.vnrom.net)
 - **Author**: [duynghien](https://github.com/duynghien)

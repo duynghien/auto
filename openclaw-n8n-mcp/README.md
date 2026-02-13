@@ -60,7 +60,7 @@ Once the script finishes, n8n is running, but the MCP service needs an API Key t
 - `/opt/clawdbot/caddy_config`: Contains Caddyfile for domain management.
 
 ### 🤝 Contact & Support
-- **Website**: [ai.vnrom.net](https://ai.vnrom.net)
+- **Website**: [vnrom.net](https://vnrom.net)
 - **Author**: [duynghien](https://github.com/duynghien)
 - **Community**: [AI & Automation (vnROM)](https://ai.vnrom.net) - Support for AI & Automation deployment.
 
@@ -125,7 +125,7 @@ Sau khi script hoàn tất, n8n đã chạy nhưng dịch vụ MCP cần có API
 - `/opt/clawdbot/caddy_config`: Chứa file Caddyfile quản lý domain.
 
 ### 🤝 Liên hệ & Hỗ trợ
-- **Website**: [ai.vnrom.net](https://ai.vnrom.net)
+- **Website**: [vnrom.net](https://vnrom.net)
 - **Author**: [duynghien](https://github.com/duynghien)
 - **Cộng đồng**: [AI & Automation (vnROM)](https://ai.vnrom.net) - Hỗ trợ triển khai AI & Automation.
 

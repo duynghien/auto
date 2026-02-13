@@ -59,7 +59,7 @@ By default, the script does not include API Keys for providers (OpenAI, Anthropi
 - `lobe-network`: Gateway and network management.
 
 ### 🤝 Contact & Support
-- **Website**: [ai.vnrom.net](https://ai.vnrom.net)
+- **Website**: [vnrom.net](https://vnrom.net)
 - **Author**: [duynghien](https://github.com/duynghien)
 - **Community**: [AI & Automation (vnROM)](https://ai.vnrom.net) - Support for AI & Automation deployment.
 
@@ -120,6 +120,6 @@ Mặc định script không bao gồm API Keys của các nhà cung cấp (OpenA
 - `lobe-network`: Gateway và quản lý mạng.
 
 ### 🤝 Liên hệ & Hỗ trợ
-- **Website**: [ai.vnrom.net](https://ai.vnrom.net)
+- **Website**: [vnrom.net](https://vnrom.net)
 - **Author**: [duynghien](https://github.com/duynghien)
-- **Cộng đồng**: [AI & Automation (vnROM)](https://ai.vnrom.net) - Hỗ trợ triển khai AI & Automation.
+- **Community**: [AI & Automation (vnROM)](https://ai.vnrom.net) - Hỗ trợ triển khai AI & Automation.

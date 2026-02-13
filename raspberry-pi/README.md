@@ -44,7 +44,7 @@ After installation, you can access Portainer via your browser:
 *Tip: Replace `<YOUR_PI_IP>` with the local IP address of your Raspberry Pi.*
 
 ### 🤝 Contact & Support
-- **Website**: [ai.vnrom.net](https://ai.vnrom.net)
+- **Website**: [vnrom.net](https://vnrom.net)
 - **Author**: [duynghien](https://github.com/duynghien)
 - **Community**: [AI & Automation (vnROM)](https://ai.vnrom.net) - Support for AI & Automation deployment.
 
@@ -90,6 +90,6 @@ Sau khi cài đặt, bạn có thể truy cập Portainer qua trình duyệt:
 *Mẹo: Thay thế `<IP_CUA_PI>` bằng địa chỉ IP nội bộ của Raspberry Pi.*
 
 ### 🤝 Liên hệ & Hỗ trợ
-- **Website**: [ai.vnrom.net](https://ai.vnrom.net)
+- **Website**: [vnrom.net](https://vnrom.net)
 - **Author**: [duynghien](https://github.com/duynghien)
 - **Community**: [AI & Automation (vnROM)](https://ai.vnrom.net) - Hỗ trợ triển khai AI & Automation.
