@@ -1,0 +1,89 @@
+# Dependencies
+node_modules/
+jspm_packages/
+.pnp
+.pnp.js
+
+# Build Output
+dist/
+build/
+coverage/
+lib-cov/
+.nyc_output/
+.vitest-cache/
+
+# Environment Variables & Secrets (CRITICAL)
+**/.env
+**/.env.local
+**/.env.*.local
+**/.env.production
+**/.env.development
+**/.env.test
+!**/.env.example
+!**/.env.test.example
+
+# Local Data & Storage
+**/storage/
+**/data/
+**/postgres-data/
+**/redis-data/
+**/minio-data/
+**/searxng-data/
+**/backups/
+
+
+# AI Agents & Context (Prevent leaking internal instructions)
+.claude/
+.opencode/
+.agent/
+.gemini/
+.cursorrules
+.aider*
+plans/
+CLAUDE.md
+AGENTS.md
+repomix-output-docs.xml
+release-manifest.json
+
+# IDEs and Editor Configuration
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Docker & Local Config
+docker-compose.override.yml
+
+# Checksums & Data
+*.bak
+*.tmp
+*.swp
+
+# AnyCrawl Deployment Specifics
+**/anycrawl-source/
+**/test_lobehub.sh
+**/searxng/settings.yml.bak
+**/searxng/__pycache__/
+

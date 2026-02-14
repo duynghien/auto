@@ -20,7 +20,12 @@ Optimized script for Mac (M1/M2/M3/M4) using OrbStack or Docker Desktop to insta
 - **Target**: Mac Mini, MacBook (Apple Silicon).
 - **Features**: Optimized for M-series, ParadeDB (PostgreSQL + pg_search + pgvector), Local S3 (RustFS/MinIO), SearXNG Search.
 
-#### 3. [LobeHub Pi 4 Installer](./lobehub-pi)
+#### 3. [AnyCrawl "Max Option" Stack](./anycrawl)
+Bilingual deployment script for AnyCrawl with PostgreSQL, MinIO, Redis, and MCP integration.
+- **Target**: Mac (M1/M2/M3/M4), Raspberry Pi (4/5), VPS.
+- **Features**: PostgreSQL 17, MinIO S3, SearXNG, MCP Server (AI Interface).
+
+#### 4. [LobeHub Pi Installer](./lobehub-pi)
 Automation script for installing LobeHub v2.0+ (database version) optimized for Raspberry Pi.
 - **Target**: Raspberry Pi 4 (8GB) / Pi 5 (ARM64).
 - **Features**: PostgreSQL + pgvector, S3 Storage, Search Engine, Redis.
@@ -68,7 +73,12 @@ Script tối ưu cho Mac (M1/M2/M3/M4) sử dụng OrbStack hoặc Docker Deskto
 - **Đối tượng**: Mac Mini, MacBook (Apple Silicon).
 - **Tính năng**: Tối ưu cho chip M, ParadeDB (PostgreSQL + pg_search + pgvector), Local S3 (RustFS/MinIO), SearXNG Search.
 
-#### 3. [LobeHub Pi 4 Installer](./lobehub-pi)
+#### 3. [AnyCrawl "Max Option" Stack](./anycrawl)
+Script triển khai AnyCrawl với PostgreSQL, MinIO, Redis và tích hợp MCP.
+- **Đối tượng**: Mac (M1/M2/M3/M4), Raspberry Pi (4/5), VPS.
+- **Tính năng**: PostgreSQL 17, MinIO S3, SearXNG, MCP Server (AI Interface).
+
+#### 4. [LobeHub Pi Installer](./lobehub-pi)
 Script tự động cài đặt LobeHub v2.0+ (bản database) tối ưu cho Raspberry Pi.
 - **Đối tượng**: Raspberry Pi 4 (8GB) / Pi 5 (ARM64).
 - **Tính năng**: PostgreSQL + pgvector, S3 Storage, Search Engine, Redis.

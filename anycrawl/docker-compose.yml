@@ -1,0 +1,169 @@
+services:
+  anycrawl:
+    container_name: anycrawl_core
+    image: anycrawl/anycrawl:latest # Using official image, but overriding cmd
+    build:
+      context: ./anycrawl-source
+      dockerfile: Dockerfile
+      target: runtime
+    restart: unless-stopped
+    environment:
+      # --- System ---
+      NODE_ENV: production
+      ANYCRAWL_API_PORT: ${ANYCRAWL_API_PORT}
+      ANYCRAWL_HEADLESS: "true"
+      ANYCRAWL_KEEPALIVE: "true"
+      ANYCRAWL_AVAILABLE_ENGINES: ${ANYCRAWL_AVAILABLE_ENGINES}
+      ANYCRAWL_IGNORE_SSL_ERROR: "true"
+
+      # --- PostgreSQL ---
+      ANYCRAWL_API_DB_TYPE: postgresql
+      ANYCRAWL_API_DB_CONNECTION: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
+
+      # --- Redis ---
+      ANYCRAWL_REDIS_URL: "redis://redis:6379"
+
+      # --- SearXNG ---
+      ANYCRAWL_SEARCH_DEFAULT_ENGINE: searxng
+      ANYCRAWL_SEARCH_ENABLED_ENGINES: searxng
+      ANYCRAWL_SEARXNG_URL: http://searxng:8080
+
+      # --- MinIO (S3) ---
+      ANYCRAWL_S3_BUCKET: ${ANYCRAWL_S3_BUCKET:-anycrawl-data}
+      ANYCRAWL_S3_REGION: us-east-1
+      ANYCRAWL_S3_ENDPOINT: http://minio:9000
+      ANYCRAWL_S3_ACCESS_KEY: ${MINIO_ROOT_USER}
+      ANYCRAWL_S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+
+      # --- AI Configuration ---
+      DEFAULT_LLM_MODEL: ${DEFAULT_LLM_MODEL:-}
+      DEFAULT_EXTRACT_MODEL: ${DEFAULT_EXTRACT_MODEL:-}
+      DEFAULT_EMBEDDING_MODEL: ${DEFAULT_EMBEDDING_MODEL:-}
+      CUSTOM_BASE_URL: ${CUSTOM_BASE_URL:-}
+      CUSTOM_API_KEY: ${CUSTOM_API_KEY:-}
+
+      # --- Credits & Timeouts ---
+      ANYCRAWL_EXTRACT_JSON_CREDITS: ${ANYCRAWL_EXTRACT_JSON_CREDITS:-5}
+      ANYCRAWL_PROXY_STEALTH_CREDITS: ${ANYCRAWL_PROXY_STEALTH_CREDITS:-5}
+      ANYCRAWL_TEMPLATE_EXECUTION_TIMEOUT: ${ANYCRAWL_TEMPLATE_EXECUTION_TIMEOUT:-600000}
+      ANYCRAWL_REQUEST_HANDLER_TIMEOUT_SECS: ${ANYCRAWL_REQUEST_HANDLER_TIMEOUT_SECS:-600}
+      ANYCRAWL_AC_ENGINE_URL: ${ANYCRAWL_AC_ENGINE_URL:-}
+
+    ports:
+      - "${ANYCRAWL_API_PORT}:${ANYCRAWL_API_PORT}"
+    volumes:
+      - ./storage:/usr/src/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      searxng:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    networks:
+      - anycrawl-network
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: anycrawl_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - anycrawl-network
+
+  redis:
+    image: redis:alpine
+    container_name: anycrawl_redis
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    networks:
+      - anycrawl-network
+
+  minio:
+    image: minio/minio
+    container_name: anycrawl_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - anycrawl-network
+
+  # Optional: Create bucket automatically
+  mc:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c " /usr/bin/mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}; /usr/bin/mc mb myminio/${ANYCRAWL_S3_BUCKET:-anycrawl-data} || true; /usr/bin/mc anonymous set public myminio/${ANYCRAWL_S3_BUCKET:-anycrawl-data}; exit 0; "
+    networks:
+      - anycrawl-network
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: anycrawl_searxng
+    restart: unless-stopped
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+    volumes:
+      - ./searxng:/etc/searxng:rw
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    networks:
+      - anycrawl-network
+
+  # Custom MCP Server for AnyCrawl
+  mcp-server:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile
+    container_name: anycrawl_mcp
+    restart: unless-stopped
+    environment:
+      ANYCRAWL_API_URL: http://anycrawl:8880
+      ANYCRAWL_API_KEY: ${ANYCRAWL_API_KEY}
+    ports:
+      - "8889:8889" # SSE port
+    depends_on:
+      - anycrawl
+    networks:
+      - anycrawl-network
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
+
+
+networks:
+  anycrawl-network:
+    driver: bridge

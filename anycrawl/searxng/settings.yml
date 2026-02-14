@@ -1,0 +1,20 @@
+use_default_settings: true
+server:
+  secret_key: "anycrawl_super_secure_random_secret_key_change_me_if_public" # Changed to avoid warning
+  limiter: false
+  image_proxy: true
+search:
+  formats:
+    - html
+    - json # REQUIRED for AnyCrawl
+engines:
+  - name: google
+    engine: google
+    use_mobile_ui: false
+    disabled: false
+  - name: bing
+    engine: bing
+    disabled: false
+  - name: duckduckgo
+    engine: duckduckgo
+    disabled: false
