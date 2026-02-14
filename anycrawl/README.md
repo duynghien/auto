@@ -44,10 +44,15 @@ Connect AnyCrawl to your favorite AI Agent (Claude, LobeHub) using the MCP endpo
 - **SSE URL**: `http://localhost:8889/sse`
 - **Stdio Command**: `docker exec -i anycrawl_mcp node index.js`
 
-Available Tools:
-- `crawl_url`: Scrape any URL into clean Markdown.
+Available Tools (8 total):
+- `scrape_url`: **(New)** Synchronous high-speed scraping with **LLM content extraction** and screenshots.
+- `crawl_url`: Asynchronous scraping into clean Markdown (best for many pages).
+- `crawl_results`: **(New)** Retrieve detailed data from completed crawl jobs.
+- `crawl_status`: Monitor background crawl job progress.
+- `crawl_cancel`: **(New)** Stop an active crawl job.
 - `search`: Web search via SearXNG.
-- `crawl_status`: Monitor background crawl jobs.
+- `list_scheduled_tasks`: **(New)** View automation schedules.
+- `list_webhooks`: **(New)** Manage notification endpoints.
 
 ### 🗺️ Access URLs
 - **AnyCrawl API**: [http://localhost:8880](http://localhost:8880)
@@ -96,10 +101,15 @@ Kết nối AnyCrawl với các Agent AI thông qua giao thức MCP:
 - **SSE URL**: `http://localhost:8889/sse`
 - **Stdio Command**: `docker exec -i anycrawl_mcp node index.js`
 
-Các công cụ hỗ trợ:
-- `crawl_url`: Cào nội dung trang web sang Markdown sạch.
-- `search`: Tìm kiếm web thông qua SearXNG.
+Các công cụ hỗ trợ (Tổng cộng 8 tools):
+- `scrape_url`: **(Mới)** Cào 1 trang đồng bộ, hỗ trợ **trích xuất dữ liệu bằng AI (LLM)** và chụp ảnh màn hình.
+- `crawl_url`: Cào nội dung sang Markdown (phù hợp cho số lượng trang lớn).
+- `crawl_results`: **(Mới)** Lấy dữ liệu chi tiết của một đợt crawl.
 - `crawl_status`: Kiểm tra trạng thái job crawl ngầm.
+- `crawl_cancel`: **(Mới)** Hủy bỏ một đợt crawl đang chạy.
+- `search`: Tìm kiếm web thông qua SearXNG.
+- `list_scheduled_tasks`: **(Mới)** Xem danh sách lịch trình cào tự động.
+- `list_webhooks`: **(Mới)** Quản lý các kênh nhận thông báo.
 
 ### �️ Địa chỉ truy cập
 - **AnyCrawl API**: [http://localhost:8880](http://localhost:8880)
