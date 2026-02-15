@@ -1,4 +1,4 @@
-# OpenClaw + n8n + MCP Stack Setup (by duynghien)
+# OpenClaw + n8n + MCP Stack v2 (by duynghien)
 
 [English](#english) | [Tiếng Việt](#tiếng-việt)
 
@@ -6,128 +6,262 @@
 
 ## English
 
-Automatic installation script for a secure AI Agent ecosystem, integrated with n8n and workflow management tools via the Model Context Protocol (MCP).
+Automatic setup script for a **Super Agent** ecosystem — OpenClaw AI agent integrated with n8n automation and MCP (Model Context Protocol).
 
-### 🚀 Key Features
-- **OpenClaw Stack**: Installs OpenClaw (Gateway + Agent) from source.
-- **n8n Automation**: Deploys n8n with a full database stack (Postgres, Redis) and Worker.
-- **MCP Integration**: Includes `n8n-custom-mcp` (by duynghien) to allow the Agent to control n8n directly.
-- **Security**: Uses Caddy (Reverse Proxy) for SSL/Domain management and isolates services within a private Docker network.
-- **Two-Way Communication**: Pre-configured Skills allow the Agent to trigger n8n and n8n to send responses back to the Agent.
+### 🚀 Feature Overview
 
-### 📋 System Requirements
-- **OS**: Ubuntu 22.04 LTS (Recommended).
-- **Minimum Specs**: 4GB RAM, 2 vCPUs (DigitalOcean $24/mo Droplet recommended).
-- **Permissions**: Must be run as `root`.
+| Feature | Description | Toggle |
+|---|---|---|
+| **OpenClaw Gateway** | Core routing & session management | Always ON |
+| **n8n Automation** | Full n8n stack (Postgres, Redis, Worker) | Always ON |
+| **n8n MCP Server** | Agent controls n8n directly via MCP protocol | ✅ ON/OFF |
+| **Watchtower** | Auto-update Docker containers daily | ✅ ON/OFF |
+| **Auto Backup** | Daily backup of n8n data + configs (3 AM) | ✅ ON/OFF |
+| **Web Browsing** | Agent skill for web search & page reading | ✅ ON/OFF |
+| **Multi-model** | Support Anthropic, DeepSeek alongside OpenAI | ✅ ON/OFF |
+| **System Prompt** | Custom agent behavior instructions | ✅ ON/OFF |
+| **Security** | Caddy reverse proxy with auto SSL + network isolation | Always ON |
+| **Health Checks** | All containers monitored with auto-restart | Always ON |
+| **Helper Script** | `openclaw` CLI for easy management | Always ON |
 
-### 🛠️ Installation Guide
+### 🏗 Architecture
 
-#### Step 1: Prepare Access Keys
-You will need:
-1. **Telegram Bot Token**: Get it from `@BotFather`.
-2. **Telegram User ID**: Get it from `@userinfobot`.
-3. **OpenAI API Key**: From OpenAI Platform.
+```mermaid
+graph TB
+    User[📱 Telegram User]
+    User --> GW[OpenClaw Gateway]
+    GW --> |"agent-net"| N8N[n8n]
+    GW --> |"egress"| Internet((Internet))
+    
+    N8N --> PG[(PostgreSQL)]
+    N8N --> RD[(Redis)]
+    N8N --> Worker[n8n Worker]
+    
+    GW --> |"MCP Client"| MCP[n8n-custom-mcp]
+    MCP --> |"n8n API"| N8N
+    
+    Caddy[Caddy SSL] --> |"frontend"| N8N
+    
+    style GW fill:#7c3aed,color:#fff
+    style N8N fill:#ff6d5a,color:#fff
+    style MCP fill:#3b82f6,color:#fff
+    style Caddy fill:#22c55e,color:#fff
+```
 
-#### Step 2: Run the Script
-Copy and run the following command on your VPS terminal:
+### 📋 Requirements
+- **OS**: Ubuntu 22.04+ or macOS (with Docker Desktop)
+- **Specs**: 4GB RAM, 2 vCPUs minimum
+- **Keys**: Telegram Bot Token, Telegram User ID, OpenAI API Key
+
+### 🛠️ Installation
 
 ```bash
 curl -O https://raw.githubusercontent.com/duynghien/auto/main/openclaw-n8n-mcp/setup.sh
 chmod +x setup.sh
-sudo ./setup.sh
+sudo ./setup.sh  # Linux (macOS: ./setup.sh)
 ```
 
-#### Step 3: Complete MCP Configuration (Important)
-Once the script finishes, n8n is running, but the MCP service needs an API Key to allow the Agent to control n8n.
-1. Access n8n: `https://n8n.<YOUR_IP>.nip.io`
-2. Create your n8n account.
-3. Go to **Settings > Personal API Keys > Create New**.
-4. Copy the generated key.
-5. Back in the terminal, edit the `.env` file:
-   ```bash
-   nano /opt/openclaw/.env
-   ```
-6. Replace `REPLACE_ME_LATER` at the `N8N_API_KEY` line with your copied key.
-7. Restart the MCP service:
-   ```bash
-   cd /opt/openclaw
-   docker compose up -d n8n-mcp
-   ```
+The script guides you through:
+1. **Feature selection** — toggle features ON/OFF via interactive menu
+2. **Credential input** — API keys, domain/IP
+3. **Automatic build** — Docker images built from source
+4. **Service startup** — all containers launched with health checks
+
+### ⚙️ Feature Toggles
+
+Features can be toggled during installation or modified later:
+
+```bash
+# View current features
+openclaw features
+
+# Edit features
+nano /opt/openclaw/features.env
+
+# Apply changes
+cd /opt/openclaw && docker compose up -d
+```
+
+### 📋 Post-Install: MCP Configuration
+
+If you skipped the n8n API Key during setup:
+
+1. Go to `https://n8n.<YOUR_DOMAIN>`
+2. Create your n8n account
+3. **Settings > Personal API Keys > Create New**
+4. Edit: `nano /opt/openclaw/.env`
+5. Replace `REPLACE_ME_LATER` with your key
+6. Restart: `cd /opt/openclaw && docker compose up -d n8n-mcp`
+
+### 🛠 Helper Commands
+
+```bash
+openclaw status       # View all container statuses
+openclaw logs         # View all logs (live)
+openclaw logs n8n     # View n8n logs only
+openclaw restart      # Restart all services
+openclaw restart n8n  # Restart specific service
+openclaw backup       # Run manual backup
+openclaw update       # Pull latest images
+openclaw features     # View feature toggles
+openclaw env          # View environment (values hidden)
+```
 
 ### 📂 Directory Structure
-- `/opt/openclaw`: Main directory containing Docker Compose and environment config.
-- `/root/.openclaw`: Contains Agent data and Skills (n8n-webhook, n8n-mcp).
-- `/opt/clawdbot/caddy_config`: Contains Caddyfile for domain management.
+```
+/opt/openclaw/
+├── docker-compose.yml    # Service definitions
+├── .env                  # Credentials & config
+├── features.env          # Feature toggles
+├── openclaw.sh           # Helper script
+├── backup.sh             # Backup script (if enabled)
+├── data/                 # OpenClaw agent data
+│   ├── openclaw.json     # Agent configuration
+│   └── workspace/
+│       ├── system-prompt.md
+│       └── skills/
+│           ├── n8n-webhook/SKILL.md
+│           ├── n8n-mcp/SKILL.md
+│           ├── web-browse/SKILL.md
+│           └── system-info/SKILL.md
+├── caddy/Caddyfile       # Reverse proxy config
+├── src/                  # Source repos
+│   ├── openclaw/
+│   └── n8n-custom-mcp/
+└── backups/              # Backup files
+```
 
 ### 🤝 Contact & Support
 - **Website**: [vnrom.net](https://vnrom.net)
 - **Author**: [duynghien](https://github.com/duynghien)
-- **Community**: [AI & Automation (vnROM)](https://ai.vnrom.net) - Support for AI & Automation deployment.
+- **Community**: [AI & Automation (vnROM)](https://ai.vnrom.net)
 
 ### 📜 Credits
-This project architecture and setup scripts are inspired by [openclaw-n8n-starter](https://github.com/Barty-Bart/openclaw-n8n-starter).
+Inspired by [openclaw-n8n-starter](https://github.com/Barty-Bart/openclaw-n8n-starter).
 
 ---
 
 ## Tiếng Việt
 
-Script cài đặt tự động hệ sinh thái AI Agent bảo mật, tích hợp với n8n và các công cụ quản lý workflow thông qua Model Context Protocol (MCP).
+Script cài đặt tự động hệ sinh thái **Siêu Agent** — OpenClaw AI tích hợp n8n automation và MCP (Model Context Protocol).
 
-### 🚀 Tính năng chính
-- **OpenClaw Stack**: Cài đặt OpenClaw (Gateway + Agent) từ nguồn.
-- **n8n Automation**: Triển khai n8n với đầy đủ database (Postgres, Redis) và Worker.
-- **Tích hợp MCP**: Bao gồm `n8n-custom-mcp` (bởi duynghien) cho phép Agent điều khiển trực tiếp n8n.
-- **Bảo mật**: Sử dụng Caddy (Reverse Proxy) để quản lý SSL/Domain và cô lập các dịch vụ trong mạng nội bộ Docker.
-- **Giao tiếp hai chiều**: Các Skills được cấu hình sẵn cho phép Agent kích hoạt n8n và n8n gửi phản hồi ngược lại cho Agent.
+### 🚀 Tổng quan tính năng
+
+| Tính năng | Mô tả | Bật/Tắt |
+|---|---|---|
+| **OpenClaw Gateway** | Điều phối routing & quản lý session | Luôn BẬT |
+| **n8n Automation** | Stack n8n đầy đủ (Postgres, Redis, Worker) | Luôn BẬT |
+| **n8n MCP Server** | Agent điều khiển n8n trực tiếp qua MCP | ✅ BẬT/TẮT |
+| **Watchtower** | Tự động cập nhật Docker containers | ✅ BẬT/TẮT |
+| **Auto Backup** | Backup tự động hàng ngày (3h sáng) | ✅ BẬT/TẮT |
+| **Web Browsing** | Skill duyệt web, tìm kiếm thông tin | ✅ BẬT/TẮT |
+| **Multi-model** | Hỗ trợ Anthropic, DeepSeek bên cạnh OpenAI | ✅ BẬT/TẮT |
+| **System Prompt** | Tùy chỉnh hành vi agent | ✅ BẬT/TẮT |
+| **Security** | Caddy reverse proxy + SSL tự động + cô lập mạng | Luôn BẬT |
+| **Health Checks** | Theo dõi & tự restart containers | Luôn BẬT |
+| **Helper Script** | CLI `openclaw` quản lý dễ dàng | Luôn BẬT |
 
 ### 📋 Yêu cầu hệ thống
-- **Hệ điều hành**: Ubuntu 22.04 LTS (Khuyên dùng).
-- **Cấu hình tối thiểu**: 4GB RAM, 2 vCPUs.
-- **Quyền hạn**: Phải chạy dưới quyền `root`.
+- **OS**: Ubuntu 22.04+ hoặc macOS (cần Docker Desktop)
+- **Cấu hình**: 4GB RAM, 2 vCPUs trở lên
+- **Keys**: Telegram Bot Token, Telegram User ID, OpenAI API Key
 
-### 🛠️ Hướng dẫn cài đặt
-
-#### Bước 1: Chuẩn bị các khóa truy cập
-Bạn cần có:
-1. **Telegram Bot Token**: Lấy từ `@BotFather`.
-2. **Telegram User ID**: Lấy từ `@userinfobot`.
-3. **OpenAI API Key**: Từ OpenAI Platform.
-
-#### Bước 2: Chạy Script
-Sao chép và chạy lệnh sau trên terminal của VPS:
+### 🛠️ Cài đặt
 
 ```bash
 curl -O https://raw.githubusercontent.com/duynghien/auto/main/openclaw-n8n-mcp/setup.sh
 chmod +x setup.sh
-sudo ./setup.sh
+sudo ./setup.sh  # Linux (macOS: ./setup.sh)
 ```
 
-#### Bước 3: Hoàn tất cấu hình MCP (Quan trọng)
-Sau khi script hoàn tất, n8n đã chạy nhưng dịch vụ MCP cần có API Key để Agent có thể điều khiển n8n.
-1. Truy cập n8n: `https://n8n.<IP_CUA_BAN>.nip.io`
-2. Tạo tài khoản n8n.
-3. Vào **Settings > Personal API Keys > Create New**.
-4. Copy key vừa tạo.
-5. Quay lại terminal, sửa file `.env`:
-   ```bash
-   nano /opt/openclaw/.env
-   ```
-6. Thay thế `REPLACE_ME_LATER` tại dòng `N8N_API_KEY` bằng key bạn vừa copy.
-7. Khởi động lại dịch vụ MCP:
-   ```bash
-   cd /opt/openclaw
-   docker compose up -d n8n-mcp
-   ```
+Script sẽ hướng dẫn bạn qua:
+1. **Chọn tính năng** — bật/tắt qua menu tương tác
+2. **Nhập thông tin** — API keys, domain/IP
+3. **Build tự động** — Docker images từ source
+4. **Khởi động** — tất cả containers với health checks
+
+### ⚙️ Bật/Tắt tính năng
+
+Tính năng có thể thay đổi khi cài đặt hoặc sau này:
+
+```bash
+# Xem tính năng hiện tại
+openclaw features
+
+# Sửa tính năng
+nano /opt/openclaw/features.env
+
+# Áp dụng
+cd /opt/openclaw && docker compose up -d
+```
+
+### 📋 Sau cài đặt: Cấu hình MCP
+
+Nếu bạn bỏ qua n8n API Key lúc cài đặt:
+
+1. Truy cập `https://n8n.<DOMAIN_CUA_BAN>`
+2. Tạo tài khoản n8n
+3. **Settings > Personal API Keys > Create New**
+4. Sửa file: `nano /opt/openclaw/.env`
+5. Thay `REPLACE_ME_LATER` bằng key vừa tạo
+6. Restart: `cd /opt/openclaw && docker compose up -d n8n-mcp`
+
+### 🛠 Lệnh quản lý
+
+```bash
+openclaw status       # Xem trạng thái containers
+openclaw logs         # Xem logs (realtime)
+openclaw logs n8n     # Xem logs n8n
+openclaw restart      # Restart tất cả
+openclaw restart n8n  # Restart dịch vụ cụ thể
+openclaw backup       # Backup thủ công
+openclaw update       # Cập nhật images
+openclaw features     # Xem feature toggles
+openclaw env          # Xem environment (ẩn giá trị)
+```
 
 ### 📂 Cấu trúc thư mục
-- `/opt/openclaw`: Thư mục chính chứa Docker Compose và cấu hình môi trường.
-- `/root/.openclaw`: Chứa dữ liệu Agent và các Skills (n8n-webhook, n8n-mcp).
-- `/opt/clawdbot/caddy_config`: Chứa file Caddyfile quản lý domain.
+```
+/opt/openclaw/
+├── docker-compose.yml    # Định nghĩa services
+├── .env                  # Credentials & cấu hình
+├── features.env          # Bật/Tắt tính năng
+├── openclaw.sh           # Script quản lý
+├── backup.sh             # Script backup (nếu bật)
+├── data/                 # Dữ liệu OpenClaw
+│   ├── openclaw.json     # Cấu hình agent
+│   └── workspace/
+│       ├── system-prompt.md
+│       └── skills/
+│           ├── n8n-webhook/SKILL.md
+│           ├── n8n-mcp/SKILL.md
+│           ├── web-browse/SKILL.md
+│           └── system-info/SKILL.md
+├── caddy/Caddyfile       # Cấu hình reverse proxy
+├── src/                  # Source repos
+│   ├── openclaw/
+│   └── n8n-custom-mcp/
+└── backups/              # File backup
+```
+
+### 🆕 Có gì mới so với v1?
+
+| | v1 | v2 |
+|---|---|---|
+| Agent | ❌ Chỉ Gateway | ✅ Gateway đầy đủ |
+| MCP | ❌ Chỉ skill text | ✅ Native MCP client |
+| n8n | ⚠️ Thiếu env vars | ✅ Full env (community packages, timezone) |
+| Network | ⚠️ Cô lập sai | ✅ `agent-net` cho giao tiếp nội bộ |
+| Toggle | ❌ Không có | ✅ Menu interactive + `features.env` |
+| Health | ❌ Không có | ✅ Tất cả services |
+| Helper | ❌ Không có | ✅ `openclaw` CLI |
+| OS | ⚠️ Chỉ Ubuntu | ✅ Ubuntu + macOS |
+| Backup | ❌ Không có | ✅ Tùy chọn |
 
 ### 🤝 Liên hệ & Hỗ trợ
 - **Website**: [vnrom.net](https://vnrom.net)
 - **Author**: [duynghien](https://github.com/duynghien)
-- **Cộng đồng**: [AI & Automation (vnROM)](https://ai.vnrom.net) - Hỗ trợ triển khai AI & Automation.
+- **Cộng đồng**: [AI & Automation (vnROM)](https://ai.vnrom.net)
 
 ### 📜 Ghi công
-Kiến trúc dự án và các script cài đặt được lấy cảm hứng từ [openclaw-n8n-starter](https://github.com/Barty-Bart/openclaw-n8n-starter).
+Lấy cảm hứng từ [openclaw-n8n-starter](https://github.com/Barty-Bart/openclaw-n8n-starter).

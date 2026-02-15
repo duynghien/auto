@@ -1,0 +1,31 @@
+# Sensitive credentials
+.env
+.env.*
+!*.example
+features.env
+
+# Generated configuration & data
+docker-compose.yml
+config.yml
+openclaw.json
+data/
+logs/
+backups/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Helper scripts (generated)
+openclaw.sh
+backup.sh
+
+# Temporary build artifacts
+node_modules/
+dist/
+build/
+coverage/
+
+# IDE settings
+.vscode/
+.idea/
