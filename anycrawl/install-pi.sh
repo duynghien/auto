@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# install-pi.sh - AnyCrawl/OpenClaw Setup for Raspberry Pi
+# install-pi.sh - AnyCrawl Setup for Raspberry Pi
 # Created by vnROM.net
 
 # Colors
@@ -8,8 +8,25 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
+PURPLE='\033[0;35m'
 
-echo -e "${GREEN}=== AnyCrawl Setup for Raspberry Pi ===${NC}"
+# Banner
+echo ""
+echo "================================================================"
+echo -e "${PURPLE}"
+echo "      _                         _     _             "
+echo "     | |                       | |   (_)            "
+echo "   __| |_   _ _   _ ____   ____| |__  _ _____ ____  "
+echo "  / _  | | | | | | |  _ \ / _  |  _ \| | ___ |  _ \ "
+echo " ( (_| | |_| | |_| | | | ( (_| | | | | | ____| | | |"
+echo "  \____|____/ \__  |_| |_|\___ |_| |_|_|_____)_| |_|"
+echo "             (____/      (_____|                    "
+echo ""
+echo "               AnyCrawl Setup for Raspberry Pi"
+echo "               Optimized for ARM64"
+echo "
+echo "================================================================${NC}"
+echo ""
 
 # Check for Root
 if [ "$EUID" -ne 0 ]; then

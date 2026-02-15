@@ -1,0 +1,12 @@
+# Crawl4AI - Gitignore
+# Sensitive files (API keys, secrets, local config)
+.llm.env
+.env
+
+# Built source code (cloned during setup)
+crawl4ai-source/
+
+# Debug/temp files
+debug_*.py
+*.pyc
+__pycache__/

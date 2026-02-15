@@ -1,0 +1,78 @@
+# Crawl4AI Full-Stack Docker Compose
+# Optimized for macOS (OrbStack) and Raspberry Pi (ARM64)
+# Created by vnROM.net
+#
+# Usage:
+#   Quick (pre-built image):  docker compose up -d
+#   Full build (all features): INSTALL_TYPE=all docker compose up -d --build
+#
+# Endpoints:
+#   API:            http://localhost:11235
+#   Dashboard:      http://localhost:11235/dashboard
+#   Playground:     http://localhost:11235/playground
+#   MCP SSE:        http://localhost:11235/mcp/sse          (Claude Desktop, Antigravity)
+#   MCP Streamable: http://localhost:11235/mcp/streamable   (LobeHub)
+#   MCP WebSocket:  ws://localhost:11235/mcp/ws
+#   MCP Schema:     http://localhost:11235/mcp/schema
+#   Health:         http://localhost:11235/health
+#   Metrics:        http://localhost:11235/metrics
+
+services:
+  crawl4ai:
+    container_name: crawl4ai
+    # Default: Pull official multi-arch image (AMD64 + ARM64)
+    image: ${C4AI_IMAGE:-unclecode/crawl4ai:${C4AI_TAG:-latest}}
+
+    # Optional: Build from source (uncomment or use --build flag)
+    build:
+      context: ./crawl4ai-source
+      dockerfile: Dockerfile
+      args:
+        INSTALL_TYPE: ${INSTALL_TYPE:-default} # default | all | torch | transformer
+        ENABLE_GPU: ${ENABLE_GPU:-false}
+
+    ports:
+      - "${C4AI_PORT:-11235}:11235"
+
+    env_file:
+      - path: .llm.env # LLM API keys (copy from .llm.env.example)
+        required: false
+
+    environment:
+      # Security (optional - enable for production)
+      - CRAWL4AI_API_TOKEN=${C4AI_API_TOKEN:-}
+      # Hooks (disabled by default for security in v0.8.0)
+      - CRAWL4AI_HOOKS_ENABLED=${C4AI_HOOKS_ENABLED:-false}
+
+    volumes:
+      # Chromium shared memory (required for performance)
+      - /dev/shm:/dev/shm
+      # Custom server configuration
+      - ./config.yml:/app/config.yml:ro
+      # Dynamic configuration entrypoint
+      - ./docker-entrypoint.sh:/docker-entrypoint.sh:ro
+
+    # Run as root to allow patching config.py
+    user: root
+
+    # Custom entrypoint to patch config before starting
+    entrypoint: [ "/bin/bash", "/docker-entrypoint.sh" ]
+    command: [ "supervisord", "-c", "supervisord.conf" ]
+
+    deploy:
+      resources:
+        limits:
+          memory: ${C4AI_MEMORY_LIMIT:-4G}
+        reservations:
+          memory: ${C4AI_MEMORY_RESERVE:-1G}
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:11235/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    # OrbStack: Automatically uses Rosetta for x86 images on Apple Silicon
+    # No extra platform config needed
