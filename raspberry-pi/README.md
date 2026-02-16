@@ -1,4 +1,4 @@
-# Raspberry Pi & ARM Toolbox (by duynghien) 🍓
+# Raspberry Pi Toolset
 
 [English](#english) | [Tiếng Việt](#tiếng-việt)
 
@@ -6,90 +6,65 @@
 
 ## English
 
-A collection of optimized scripts for Raspberry Pi (4/5) and ARM-based servers. Helps you set up a Docker environment and container management tools in just a few steps.
+A unified toolkit for setting up **Docker**, **Portainer**, and **System Optimizations** on Raspberry Pi 4/5 (64-bit OS).
 
-### 🚀 Features
-- **Docker Engine**: Installs the latest version from Docker Official.
-- **Docker Compose**: Supports multi-container management.
-- **Portainer CE**: Intuitive, easy-to-use web interface for Docker management.
-- **ARM Optimization**: Automatically configures parameters suitable for ARM platforms.
+### Installation
 
-### 📋 Requirements
-- Raspberry Pi OS, Ubuntu ARM, or any ARM-based Linux distribution.
-- Sudo/Root permissions.
-
-### 🛠️ Installation Guide
-
-You can download the script file directly or clone the entire repository:
-
-#### Method 1: Full Installation (Docker + Portainer)
-This is the fastest way to get a complete environment.
 ```bash
-curl -O https://raw.githubusercontent.com/duynghien/auto/main/raspberry-pi/piDockerPortainer.sh
-chmod +x piDockerPortainer.sh
-sudo ./piDockerPortainer.sh
+# Clone repo
+mkdir -p ~/self-hosted
+cd ~/self-hosted
+git clone https://github.com/duynghien/auto.git
+cd auto/raspberry-pi
+
+# Run setup
+chmod +x setup.sh
+sudo ./setup.sh
 ```
 
-#### Method 2: Individual Installation
-- **Install Docker Only**: `sudo sh piDocker.sh`
-- **Install Portainer Only**: `sudo sh piPortainer.sh`
+### Menu Options
 
----
-
-### 🖥️ Accessing Portainer
-After installation, you can access Portainer via your browser:
-- **HTTP**: `http://<YOUR_PI_IP>:9000`
-- **HTTPS**: `https://<YOUR_PI_IP>:9443`
-
-*Tip: Replace `<YOUR_PI_IP>` with the local IP address of your Raspberry Pi.*
-
-### 🤝 Contact & Support
-- **Website**: [vnrom.net](https://vnrom.net)
-- **Author**: [duynghien](https://github.com/duynghien)
-- **Community**: [AI & Automation (vnROM)](https://ai.vnrom.net) - Support for AI & Automation deployment.
+1. **Install Docker & Compose**: Installs Docker engine and Docker Compose plugin (official method).
+2. **Install Portainer CE**: Deploys Portainer for container management on port `9443`.
+3. **Install Full Stack**: Installs both Docker and Portainer.
+4. **System Optimization**:
+   - Updates all packages (`apt update && upgrade`).
+   - Installs useful tools: `htop`, `btop`, `neofetch`, `git`, `curl`.
+   - **Auto-Swap**: Adds 2GB swap file if RAM < 3GB (essential for compiling/heavy loads).
 
 ---
 
 ## Tiếng Việt
 
-Tập hợp các script tối ưu cho Raspberry Pi (4/5) và các máy chủ chạy ARM. Giúp bạn thiết lập môi trường Docker và các công cụ quản lý container chỉ trong vài bước.
+Bộ công cụ cài đặt tự động cho **Raspberry Pi 4/5** (hệ điều hành 64-bit).
 
-### 🚀 Tính năng
-- **Docker Engine**: Cài đặt phiên bản mới nhất từ Docker Official.
-- **Docker Compose**: Hỗ trợ quản lý đa container.
-- **Portainer CE**: Giao diện web trực quan, dễ sử dụng để quản lý Docker.
-- **Tối ưu ARM**: Tự động cấu hình các tham số phù hợp với nền tảng ARM.
+### Cài đặt
 
-### 📋 Yêu cầu
-- Raspberry Pi OS, Ubuntu ARM, hoặc bất kỳ bản phân phối Linux ARM nào.
-- Quyền Sudo/Root.
-
-### 🛠️ Hướng dẫn cài đặt
-
-Bạn có thể tải trực tiếp các file script hoặc clone toàn bộ repository:
-
-#### Cách 1: Cài đặt đầy đủ (Docker + Portainer)
-Đây là cách nhanh nhất để có một môi trường hoàn chỉnh.
 ```bash
-curl -O https://raw.githubusercontent.com/duynghien/auto/main/raspberry-pi/piDockerPortainer.sh
-chmod +x piDockerPortainer.sh
-sudo ./piDockerPortainer.sh
+# Tải mã nguồn
+mkdir -p ~/self-hosted
+cd ~/self-hosted
+git clone https://github.com/duynghien/auto.git
+cd auto/raspberry-pi
+
+# Chạy script
+chmod +x setup.sh
+sudo ./setup.sh
 ```
 
-#### Cách 2: Cài đặt từng phần
-- **Chỉ cài Docker**: `sudo sh piDocker.sh`
-- **Chỉ cài Portainer**: `sudo sh piPortainer.sh`
+### Các tùy chọn
+
+1. **Cài Docker & Compose**: Cài đặt Docker engine và plugin Docker Compose (theo chuẩn mới nhất).
+2. **Cài Portainer CE**: Cài giao diện quản lý Portainer (cổng `9443`).
+3. **Cài Full Stack**: Cài cả Docker và Portainer cùng lúc.
+4. **Tối ưu hệ thống**:
+   - Cập nhật hệ thống (`apt update && upgrade`).
+   - Cài các công cụ quản lý: `htop`, `btop`, `neofetch`...
+   - **Tự động Swap**: Tạo 2GB Root Swap nếu RAM < 3GB (quan trọng để tránh treo máy khi tải nặng).
 
 ---
 
-### 🖥️ Truy cập Portainer
-Sau khi cài đặt, bạn có thể truy cập Portainer qua trình duyệt:
-- **HTTP**: `http://<IP_CUA_PI>:9000`
-- **HTTPS**: `https://<IP_CUA_PI>:9443`
+## Support
 
-*Mẹo: Thay thế `<IP_CUA_PI>` bằng địa chỉ IP nội bộ của Raspberry Pi.*
-
-### 🤝 Liên hệ & Hỗ trợ
-- **Website**: [vnrom.net](https://vnrom.net)
+- **Website**: [ai.vnrom.net](https://ai.vnrom.net)
 - **Author**: [duynghien](https://github.com/duynghien)
-- **Community**: [AI & Automation (vnROM)](https://ai.vnrom.net) - Hỗ trợ triển khai AI & Automation.

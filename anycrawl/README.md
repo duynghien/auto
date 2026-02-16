@@ -13,11 +13,13 @@ The most complete and optimized self-hosted stack for **AnyCrawl**, featuring en
 - **📦 S3 Storage**: Integrated **MinIO** for storing crawl artifacts (HTML, PDF, Screenshots) using the S3 standard.
 - **🔍 Privacy-First Search**: Built-in **SearXNG** backend for Google/Bing searches without expensive proxies.
 - **🛠️ AI Agent Ready**: Includes a dedicated **MCP Server** (SSE/Stdio) for seamless connection with LobeHub, Claude Desktop, and OpenClaw.
-- **🪄 One-Click Setup**: Automated scripts for both macOS (Apple Silicon) and Raspberry Pi.
+- **🪄 One-Click Setup**: Automated script for **macOS**, **Raspberry Pi**, and **Linux VPS** (amd64/arm64).
 
 ### 📋 Requirements
-- **Hardware**: Mac (M1/M2/M3/M4) or Raspberry Pi (4/5).
-- **Software**: Docker and Docker Compose installed (recommend [OrbStack](https://orbstack.dev/) for Mac).
+- **Hardware**: Mac (Apple Silicon), Raspberry Pi (4/5), or Linux VPS.
+- **Software**: 
+  - macOS: Docker Desktop or [OrbStack](https://orbstack.dev/) (recommended).
+  - Linux: Docker will be installed automatically if missing.
 
 ### 🛠️ Installation Guide
 
@@ -30,14 +32,12 @@ cd ~/self-hosted
 git clone https://github.com/duynghien/auto.git anycrawl-stack
 cd anycrawl-stack/anycrawl
 
-# Run the setup script (macOS)
+# Run the unified setup script
 chmod +x setup.sh
 ./setup.sh
-
-# Or for Raspberry Pi
-# sudo chmod +x install-pi.sh
-# sudo ./install-pi.sh
 ```
+
+The script will automatically detect your OS (macOS, Pi, or VPS) and configure the environment accordingly.
 
 ### 🤖 MCP Integration (AI Agents)
 Connect AnyCrawl to your favorite AI Agent (Claude, LobeHub) using the MCP endpoint:
@@ -70,11 +70,13 @@ Bộ cài đặt tự động AnyCrawl tối ưu nhất, tích hợp đầy đ�
 - **📦 Lưu trữ chuẩn S3**: Tích hợp **MinIO** để quản lý file (HTML, PDF, Ảnh chụp màn hình) theo chuẩn S3, dễ dàng backup và di chuyển.
 - **🔍 Tìm kiếm bảo mật**: Tích hợp sẵn **SearXNG**, cho phép AI tìm kiếm Google/Bing mà không tốn tiền mua Proxy.
 - **🛠️ Sẵn sàng cho AI Agent**: Code thêm **MCP Server** chuyên dụng, cho phép LobeHub, Claude Desktop hay OpenClaw điều khiển AnyCrawl trực tiếp.
-- **🪄 Setup 1-Click**: Script tự động hóa hoàn toàn cho macOS (Apple Silicon) và Raspberry Pi.
+- **🪄 Setup 1-Click**: Script tự động hóa hoàn toàn cho **macOS**, **Raspberry Pi**, và **Linux VPS**.
 
 ### 📋 Yêu cầu hệ thống
-- **Phần cứng**: Mac chip M1/M2/M3/M4 hoặc Raspberry Pi (4/5).
-- **Phần mềm**: Đã cài đặt Docker (khuyên dùng [OrbStack](https://orbstack.dev/) trên Mac).
+- **Phần cứng**: Mac (Apple Silicon), Raspberry Pi (4/5), hoặc Linux VPS.
+- **Phần mềm**: 
+  - macOS: Cần cài sẵn Docker Desktop hoặc [OrbStack](https://orbstack.dev/).
+  - Linux: Tự động cài Docker nếu chưa có.
 
 ### 🛠️ Hướng dẫn cài đặt
 
@@ -87,13 +89,9 @@ cd ~/self-hosted
 git clone https://github.com/duynghien/auto.git anycrawl-stack
 cd anycrawl-stack/anycrawl
 
-# Chạy script cài đặt (Cho macOS)
+# Chạy script cài đặt (tự nhận diện OS)
 chmod +x setup.sh
 ./setup.sh
-
-# Hoặc cho Raspberry Pi
-# sudo chmod +x install-pi.sh
-# sudo ./install-pi.sh
 ```
 
 ### 🤖 Tích hợp AI Agent (MCP)
@@ -111,7 +109,7 @@ Các công cụ hỗ trợ (Tổng cộng 8 tools):
 - `list_scheduled_tasks`: **(Mới)** Xem danh sách lịch trình cào tự động.
 - `list_webhooks`: **(Mới)** Quản lý các kênh nhận thông báo.
 
-### �️ Địa chỉ truy cập
+### 🗺️ Địa chỉ truy cập
 - **AnyCrawl API**: [http://localhost:8880](http://localhost:8880)
 - **MinIO Console**: [http://localhost:9001](http://localhost:9001)
 - **SearXNG**: [http://localhost:8080](http://localhost:8080)
@@ -119,6 +117,5 @@ Các công cụ hỗ trợ (Tổng cộng 8 tools):
 ---
 
 ## 🤝 Support & Community
-- **Website**: [vnrom.net](https://vnrom.net)
+- **Website**: [ai.vnrom.net](https://ai.vnrom.net)
 - **Author**: [duynghien](https://github.com/duynghien)
-- **Community**: [AI & Automation (vnROM)](https://ai.vnrom.net)

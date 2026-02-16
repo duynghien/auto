@@ -76,10 +76,10 @@ Features can be toggled during installation or modified later:
 openclaw features
 
 # Edit features
-nano /opt/openclaw/features.env
+nano ~/self-hosted/openclaw/features.env
 
 # Apply changes
-cd /opt/openclaw && docker compose up -d
+cd ~/self-hosted/openclaw && docker compose up -d
 ```
 
 ### 📋 Post-Install: MCP Configuration
@@ -89,9 +89,9 @@ If you skipped the n8n API Key during setup:
 1. Go to `https://n8n.<YOUR_DOMAIN>`
 2. Create your n8n account
 3. **Settings > Personal API Keys > Create New**
-4. Edit: `nano /opt/openclaw/.env`
+4. Edit: `nano ~/self-hosted/openclaw/.env`
 5. Replace `REPLACE_ME_LATER` with your key
-6. Restart: `cd /opt/openclaw && docker compose up -d n8n-mcp`
+6. Restart: `cd ~/self-hosted/openclaw && docker compose up -d n8n-mcp`
 
 ### 🛠 Helper Commands
 
@@ -109,7 +109,7 @@ openclaw env          # View environment (values hidden)
 
 ### 📂 Directory Structure
 ```
-/opt/openclaw/
+~/self-hosted/openclaw/
 ├── docker-compose.yml    # Service definitions
 ├── .env                  # Credentials & config
 ├── features.env          # Feature toggles
@@ -189,10 +189,10 @@ Tính năng có thể thay đổi khi cài đặt hoặc sau này:
 openclaw features
 
 # Sửa tính năng
-nano /opt/openclaw/features.env
+nano ~/self-hosted/openclaw/features.env
 
 # Áp dụng
-cd /opt/openclaw && docker compose up -d
+cd ~/self-hosted/openclaw && docker compose up -d
 ```
 
 ### 📋 Sau cài đặt: Cấu hình MCP
@@ -202,9 +202,9 @@ Nếu bạn bỏ qua n8n API Key lúc cài đặt:
 1. Truy cập `https://n8n.<DOMAIN_CUA_BAN>`
 2. Tạo tài khoản n8n
 3. **Settings > Personal API Keys > Create New**
-4. Sửa file: `nano /opt/openclaw/.env`
+4. Sửa file: `nano ~/self-hosted/openclaw/.env`
 5. Thay `REPLACE_ME_LATER` bằng key vừa tạo
-6. Restart: `cd /opt/openclaw && docker compose up -d n8n-mcp`
+6. Restart: `cd ~/self-hosted/openclaw && docker compose up -d n8n-mcp`
 
 ### 🛠 Lệnh quản lý
 
@@ -222,7 +222,7 @@ openclaw env          # Xem environment (ẩn giá trị)
 
 ### 📂 Cấu trúc thư mục
 ```
-/opt/openclaw/
+~/self-hosted/openclaw/
 ├── docker-compose.yml    # Định nghĩa services
 ├── .env                  # Credentials & cấu hình
 ├── features.env          # Bật/Tắt tính năng

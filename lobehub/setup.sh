@@ -1,6 +1,7 @@
 #!/bin/bash
 ################################################################
-# LobeHub v3.0 Auto-Install for macOS Apple Silicon
+# LobeHub v4.0 Unified Auto-Install
+# Supports: macOS (Apple Silicon), Raspberry Pi, VPS (amd64/arm64)
 # Full features: Knowledge Base, Search, Upload, Artifacts, ...
 # Based on official lobehub/lobe-chat docker-compose deployment
 ################################################################
@@ -16,10 +17,41 @@ PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
+
 # Functions
 pok()  { echo -e "${GREEN}  ✓${NC} $1"; }
 pwn()  { echo -e "${YELLOW}  ⚠${NC} $1"; }
 perr() { echo -e "${RED}  ✗${NC} $1"; }
+
+# ========================================
+# Platform Detection
+# ========================================
+OS=$(uname -s)
+ARCH=$(uname -m)
+
+if [[ "$OS" == "Darwin" ]]; then
+    PLATFORM="mac"
+    PLATFORM_LABEL="macOS Apple Silicon"
+elif [[ "$OS" == "Linux" ]]; then
+    # Detect Raspberry Pi
+    if grep -qi 'raspberry\|raspbian' /proc/device-tree/model 2>/dev/null || \
+       grep -qi 'raspberry' /etc/os-release 2>/dev/null; then
+        PLATFORM="pi"
+        PLATFORM_LABEL="Raspberry Pi (ARM64)"
+    elif [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
+        PLATFORM="vps-arm64"
+        PLATFORM_LABEL="Linux VPS (ARM64)"
+    elif [[ "$ARCH" == "x86_64" ]]; then
+        PLATFORM="vps-amd64"
+        PLATFORM_LABEL="Linux VPS (AMD64)"
+    else
+        PLATFORM="vps-amd64"
+        PLATFORM_LABEL="Linux ($ARCH)"
+    fi
+else
+    echo -e "${RED}Unsupported OS: $OS${NC}"
+    exit 1
+fi
 
 pheader() {
     echo ""
@@ -33,7 +65,7 @@ pheader() {
     echo "  \____|____/ \__  |_| |_|\___ |_| |_|_|_____)_| |_|"
     echo "             (____/      (_____|                    "
     echo ""
-    echo "        LobeHub macOS Apple Silicon Setup v3.0"
+    echo "        LobeHub Setup v4.0 — $PLATFORM_LABEL"
     echo "   Full: Search · Knowledge Base · Upload · Artifacts"
     echo "================================================================${NC}"
 }
@@ -63,36 +95,77 @@ fi
 # Network Mode Selection
 # ========================================
 
-# Auto-detect LAN IP
-LAN_IP=$(ipconfig getifaddr en0 2>/dev/null || echo "")
-[ -z "$LAN_IP" ] && LAN_IP=$(ipconfig getifaddr en1 2>/dev/null || echo "")
-[ -z "$LAN_IP" ] && LAN_IP=$(ifconfig | grep 'inet ' | grep -v '127.0.0.1' | head -1 | awk '{print $2}' || echo "")
+# Auto-detect LAN IP (platform-specific)
+if [[ "$PLATFORM" == "mac" ]]; then
+    LAN_IP=$(ipconfig getifaddr en0 2>/dev/null || echo "")
+    [ -z "$LAN_IP" ] && LAN_IP=$(ipconfig getifaddr en1 2>/dev/null || echo "")
+    [ -z "$LAN_IP" ] && LAN_IP=$(ifconfig | grep 'inet ' | grep -v '127.0.0.1' | head -1 | awk '{print $2}' || echo "")
+else
+    LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "")
+    [ -z "$LAN_IP" ] && LAN_IP=$(ip route get 1 2>/dev/null | awk '{print $7;exit}' || echo "")
+fi
+
+# Default: Pi/VPS default to LAN, Mac defaults to localhost
+if [[ "$PLATFORM" == "mac" ]]; then
+    DEFAULT_NET="1"
+else
+    DEFAULT_NET="2"
+fi
 
 echo ""
 if [[ "$LANG" == "vi" ]]; then
     echo "  Chế độ truy cập:"
     echo ""
-    echo "    1) Localhost (chỉ truy cập từ máy này - mặc định)"
-    if [ -n "$LAN_IP" ]; then
-        echo "    2) LAN / Home Server (truy cập từ các thiết bị khác: $LAN_IP)"
+    if [[ "$DEFAULT_NET" == "1" ]]; then
+        echo "    1) Localhost (chỉ truy cập từ máy này - mặc định)"
     else
-        echo "    2) LAN / Home Server (nhập IP thủ công)"
+        echo "    1) Localhost (chỉ truy cập từ máy này)"
+    fi
+    if [ -n "$LAN_IP" ]; then
+        if [[ "$DEFAULT_NET" == "2" ]]; then
+            echo "    2) LAN / Home Server (truy cập từ các thiết bị khác: $LAN_IP) (mặc định)"
+        else
+            echo "    2) LAN / Home Server (truy cập từ các thiết bị khác: $LAN_IP)"
+        fi
+    else
+        if [[ "$DEFAULT_NET" == "2" ]]; then
+            echo "    2) LAN / Home Server (nhập IP thủ công) (mặc định)"
+        else
+            echo "    2) LAN / Home Server (nhập IP thủ công)"
+        fi
     fi
 else
     echo "  Access mode:"
     echo ""
-    echo "    1) Localhost only (access from this machine - default)"
-    if [ -n "$LAN_IP" ]; then
-        echo "    2) LAN / Home Server (access from other devices: $LAN_IP)"
+    if [[ "$DEFAULT_NET" == "1" ]]; then
+        echo "    1) Localhost only (access from this machine - default)"
     else
-        echo "    2) LAN / Home Server (enter IP manually)"
+        echo "    1) Localhost only (access from this machine)"
+    fi
+    if [ -n "$LAN_IP" ]; then
+        if [[ "$DEFAULT_NET" == "2" ]]; then
+            echo "    2) LAN / Home Server (access from other devices: $LAN_IP) (default)"
+        else
+            echo "    2) LAN / Home Server (access from other devices: $LAN_IP)"
+        fi
+    else
+        if [[ "$DEFAULT_NET" == "2" ]]; then
+            echo "    2) LAN / Home Server (enter IP manually) (default)"
+        else
+            echo "    2) LAN / Home Server (enter IP manually)"
+        fi
     fi
 fi
 echo ""
-read -p "  Enter 1 or 2 [1]: " NET_CHOICE
-NET_CHOICE=${NET_CHOICE:-1}
+read -p "  Enter 1 or 2 [$DEFAULT_NET]: " NET_CHOICE
+NET_CHOICE=${NET_CHOICE:-$DEFAULT_NET}
 
-if [[ "$NET_CHOICE" == "2" ]]; then
+if [[ "$NET_CHOICE" == "1" ]]; then
+    NETWORK_MODE="localhost"
+    LAN_IP="localhost"
+    APP_URL="http://localhost:3210"
+    S3_PUBLIC_ENDPOINT="http://localhost:9000"
+elif [[ "$NET_CHOICE" == "2" ]]; then
     NETWORK_MODE="lan"
     if [ -n "$LAN_IP" ]; then
         if [[ "$LANG" == "vi" ]]; then
@@ -100,17 +173,17 @@ if [[ "$NET_CHOICE" == "2" ]]; then
             read -p "  Sử dụng IP $LAN_IP? (Enter = OK, hoặc nhập IP khác): " CUSTOM_IP
         else
             echo ""
-            read -p "  Use IP $LAN_IP? (Enter = OK, or type a different IP): " CUSTOM_IP
+            read -p "  Use IP $LAN_IP? (Enter = OK, or type another): " CUSTOM_IP
         fi
         [ -n "$CUSTOM_IP" ] && LAN_IP="$CUSTOM_IP"
     else
         if [[ "$LANG" == "vi" ]]; then
-            read -p "  Nhập IP LAN của máy Mac: " LAN_IP
+            read -p "  Nhập IP LAN: " LAN_IP
         else
-            read -p "  Enter the Mac's LAN IP address: " LAN_IP
+            read -p "  Enter LAN IP: " LAN_IP
         fi
         if [ -z "$LAN_IP" ]; then
-            perr "IP is required for LAN mode!"
+            perr "IP is required for LAN mode"
             exit 1
         fi
     fi
@@ -124,10 +197,11 @@ else
 fi
 
 if [[ "$LANG" == "vi" ]]; then
-    pok "Chế độ: $( [[ "$NETWORK_MODE" == "lan" ]] && echo "LAN ($LAN_IP)" || echo "Localhost" )"
+    pok "Nền tảng: $PLATFORM_LABEL"
 else
-    pok "Mode: $( [[ "$NETWORK_MODE" == "lan" ]] && echo "LAN ($LAN_IP)" || echo "Localhost" )"
+    pok "Platform: $PLATFORM_LABEL"
 fi
+pok "Mode: $( [[ "$NETWORK_MODE" == "lan" ]] && echo "LAN ($LAN_IP)" || echo "Localhost" )"
 
 # ========================================
 # i18n: All translatable strings
@@ -140,11 +214,11 @@ t() {
     case "$key" in
         # Step titles
         step1)
-            [[ "$LANG" == "vi" ]] && text="[1/10] Kiểm tra hệ thống Mac" || text="[1/10] Checking Mac system";;
+            [[ "$LANG" == "vi" ]] && text="[1/10] Kiểm tra hệ thống" || text="[1/10] Checking system";;
         step2)
-            [[ "$LANG" == "vi" ]] && text="[2/10] Khởi tạo thư mục" || text="[2/10] Creating directory";;
+            [[ "$LANG" == "vi" ]] && text="[2/10] Cấu hình hệ thống & Docker" || text="[2/10] System setup & Docker";;
         step3)
-            [[ "$LANG" == "vi" ]] && text="[3/10] Sinh Secrets (lưu vào .env)" || text="[3/10] Generating Secrets (saving to .env)";;
+            [[ "$LANG" == "vi" ]] && text="[3/10] Khởi tạo thư mục & Sinh Secrets" || text="[3/10] Creating directory & Generating Secrets";;
         step4)
             [[ "$LANG" == "vi" ]] && text="[4/10] Chọn S3 Storage" || text="[4/10] Choose S3 Storage";;
         step5)
@@ -160,9 +234,13 @@ t() {
         step10)
             [[ "$LANG" == "vi" ]] && text="[10/10] Hoàn tất" || text="[10/10] Finishing up";;
 
-        # Step 1: System check
-        err_macos)
-            [[ "$LANG" == "vi" ]] && text="Script chỉ dành cho macOS!" || text="This script is for macOS only!";;
+        # System check
+        err_arch)
+            [[ "$LANG" == "vi" ]] && text="Kiến trúc không hỗ trợ: $ARCH" || text="Unsupported architecture: $ARCH";;
+        err_disk)
+            [[ "$LANG" == "vi" ]] && text="Ổ đĩa chỉ còn ${1}GB < 8GB tối thiểu!" || text="Disk only has ${1}GB < 8GB minimum!";;
+        err_missing)
+            [[ "$LANG" == "vi" ]] && text="Thiếu: $1" || text="Missing: $1";;
         warn_not_apple_silicon)
             [[ "$LANG" == "vi" ]] && text="Không phải Apple Silicon, hiệu năng sẽ ảnh hưởng" || text="Not Apple Silicon, performance may be affected";;
         ok_apple_silicon)
@@ -175,20 +253,20 @@ t() {
             [[ "$LANG" == "vi" ]] && text="Docker Desktop có thể chưa chạy" || text="Docker Desktop may not be running";;
         err_compose)
             [[ "$LANG" == "vi" ]] && text="Docker Compose Plugin chưa cài đặt!" || text="Docker Compose Plugin is not installed!";;
-        err_missing)
-            [[ "$LANG" == "vi" ]] && text="Thiếu: $1" || text="Missing: $1";;
 
-        # Step 2: Directory
-        ok_dir)
-            [[ "$LANG" == "vi" ]] && text="Thư mục: $1" || text="Directory: $1";;
+        # Swap & Docker
+        ok_swap)
+            [[ "$LANG" == "vi" ]] && text="Swap: $1" || text="Swap: $1";;
+        warn_logout)
+            [[ "$LANG" == "vi" ]] && text="Cần logout/login lại để dùng docker không sudo" || text="Need to logout/login to use docker without sudo";;
 
-        # Step 3: Secrets
+        # Secrets
         warn_env_found)
             [[ "$LANG" == "vi" ]] && text="Tìm thấy .env cũ, giữ nguyên secrets..." || text="Found existing .env, preserving secrets...";;
         ok_jwks)
             [[ "$LANG" == "vi" ]] && text="Tạo JWKS RSA Key..." || text="Generating JWKS RSA Key...";;
 
-        # Step 4: S3 choice
+        # S3 choice
         s3_option1)
             [[ "$LANG" == "vi" ]] && text="  1) RustFS (mặc định LobeHub, nhẹ, nhanh)" || text="  1) RustFS (LobeHub default, lightweight, fast)";;
         s3_option2)
@@ -198,19 +276,19 @@ t() {
         ok_s3_choice)
             [[ "$LANG" == "vi" ]] && text="Chọn: $1" || text="Selected: $1";;
 
-        # Step 5: Save .env
+        # Save .env
         env_warning)
             [[ "$LANG" == "vi" ]] && text="# ⚠️  KHÔNG chia sẻ file này! Chứa thông tin nhạy cảm" || text="# ⚠️  DO NOT share this file! Contains sensitive information";;
         ok_env_saved)
             [[ "$LANG" == "vi" ]] && text="Config đã lưu vào .env" || text="Config saved to .env";;
 
-        # Step 6: Config files
+        # Config files
         ok_searxng_dl)
             [[ "$LANG" == "vi" ]] && text="Tải searxng-settings.yml từ LobeHub official..." || text="Downloading searxng-settings.yml from LobeHub official...";;
         warn_searxng_fallback)
             [[ "$LANG" == "vi" ]] && text="Không tải được từ GitHub, tạo config mặc định..." || text="Failed to download from GitHub, creating default config...";;
 
-        # Step 8: Start services
+        # Start services
         ok_stop_old)
             [[ "$LANG" == "vi" ]] && text="Dừng containers cũ (nếu có)..." || text="Stopping old containers (if any)...";;
         ok_pull)
@@ -218,9 +296,9 @@ t() {
         ok_start_infra)
             [[ "$LANG" == "vi" ]] && text="Khởi động PostgreSQL, Redis & SearXNG..." || text="Starting PostgreSQL, Redis & SearXNG...";;
         ok_wait_pg)
-            [[ "$LANG" == "vi" ]] && text="Đang chờ PostgreSQL (ParadeDB)..." || text="Waiting for PostgreSQL (ParadeDB)...";;
+            [[ "$LANG" == "vi" ]] && text="Đang chờ PostgreSQL..." || text="Waiting for PostgreSQL...";;
         ok_pg_ready)
-            [[ "$LANG" == "vi" ]] && text="PostgreSQL (ParadeDB): sẵn sàng!" || text="PostgreSQL (ParadeDB): ready!";;
+            [[ "$LANG" == "vi" ]] && text="PostgreSQL: sẵn sàng!" || text="PostgreSQL: ready!";;
         err_pg)
             [[ "$LANG" == "vi" ]] && text="PostgreSQL không khởi động được!" || text="PostgreSQL failed to start!";;
         ok_wait_redis)
@@ -256,7 +334,7 @@ t() {
         warn_lobe_slow)
             [[ "$LANG" == "vi" ]] && text="LobeHub cần thêm thời gian khởi động" || text="LobeHub needs more time to start";;
 
-        # Step 9: Verify
+        # Verify
         err_pg_verify)
             [[ "$LANG" == "vi" ]] && text="PostgreSQL: LỖI" || text="PostgreSQL: ERROR";;
         err_redis_verify)
@@ -268,7 +346,7 @@ t() {
         err_searxng_verify)
             [[ "$LANG" == "vi" ]] && text="SearXNG: LỖI (search sẽ không hoạt động)" || text="SearXNG: ERROR (search will not work)";;
 
-        # Step 10: Finish
+        # Finish
         finish_ok)
             [[ "$LANG" == "vi" ]] && text="🎉 CÀI ĐẶT HOÀN TẤT!" || text="🎉 INSTALLATION COMPLETE!";;
         finish_warn)
@@ -276,7 +354,7 @@ t() {
         features_title)
             [[ "$LANG" == "vi" ]] && text="✨ Tính năng đã bật:" || text="✨ Enabled features:";;
         feat_kb)
-            [[ "$LANG" == "vi" ]] && text="  ✓ Knowledge Base (ParadeDB: pgvector + pg_search)" || text="  ✓ Knowledge Base (ParadeDB: pgvector + pg_search)";;
+            [[ "$LANG" == "vi" ]] && text="  ✓ Knowledge Base (pgvector + full-text search)" || text="  ✓ Knowledge Base (pgvector + full-text search)";;
         feat_upload)
             [[ "$LANG" == "vi" ]] && text="  ✓ Upload files & photos (S3 + proxy)" || text="  ✓ Upload files & photos (S3 + proxy)";;
         feat_search)
@@ -289,6 +367,8 @@ t() {
             [[ "$LANG" == "vi" ]] && text="  ✓ Memory & Chat History (server-side DB)" || text="  ✓ Memory & Chat History (server-side DB)";;
         feat_crawl)
             [[ "$LANG" == "vi" ]] && text="  ✓ Web Crawling (naive crawler)" || text="  ✓ Web Crawling (naive crawler)";;
+        feat_auth)
+            [[ "$LANG" == "vi" ]] && text="  ✓ Better Auth (Email/Password)" || text="  ✓ Better Auth (Email/Password)";;
         important_title)
             [[ "$LANG" == "vi" ]] && text="⚠️  QUAN TRỌNG:" || text="⚠️  IMPORTANT:";;
         important_env)
@@ -300,11 +380,11 @@ t() {
         usage_1)
             [[ "$LANG" == "vi" ]] && text="  1. Truy cập: $APP_URL" || text="  1. Open: $APP_URL";;
         usage_2)
-            [[ "$LANG" == "vi" ]] && text="  2. Thêm API Key (OpenAI/Claude/Gemini) trong Settings" || text="  2. Add API Key (OpenAI/Claude/Gemini) in Settings";;
+            [[ "$LANG" == "vi" ]] && text="  2. Tạo tài khoản (email + password)" || text="  2. Create an account (email + password)";;
         usage_3)
-            [[ "$LANG" == "vi" ]] && text="  3. Bật 'Smart Search' để test Online Search" || text="  3. Enable 'Smart Search' to test Online Search";;
+            [[ "$LANG" == "vi" ]] && text="  3. Thêm API Key (OpenAI/Claude/Gemini) trong Settings" || text="  3. Add API Key (OpenAI/Claude/Gemini) in Settings";;
         usage_4)
-            [[ "$LANG" == "vi" ]] && text="  4. Upload file để test Knowledge Base" || text="  4. Upload a file to test Knowledge Base";;
+            [[ "$LANG" == "vi" ]] && text="  4. Bật 'Smart Search' để test Online Search" || text="  4. Enable 'Smart Search' to test Online Search";;
         manage_title)
             [[ "$LANG" == "vi" ]] && text="Quản lý:" || text="Management:";;
         notes_title)
@@ -314,7 +394,7 @@ t() {
         note_2)
             [[ "$LANG" == "vi" ]] && text="  • Secrets được lưu trong .env - backup file này nếu cần!" || text="  • Secrets are stored in .env - back up this file if needed!";;
         note_3)
-            [[ "$LANG" == "vi" ]] && text="  • Test search: ./lobe.sh search-test 'thời tiết hôm nay'" || text="  • Test search: ./lobe.sh search-test 'weather today'";;
+            [[ "$LANG" == "vi" ]] && text="  • Test search: ./lobe.sh search-test 'weather today'" || text="  • Test search: ./lobe.sh search-test 'weather today'";;
         *)
             text="[MISSING: $key]";;
     esac
@@ -328,41 +408,59 @@ t() {
 echo ""
 echo "$(t step1)"
 
-# Check macOS
-if [[ "$(uname)" != "Darwin" ]]; then
-    perr "$(t err_macos)"
-    exit 1
-fi
+if [[ "$PLATFORM" == "mac" ]]; then
+    # macOS checks
+    if [[ "$ARCH" != "arm64" ]]; then
+        pwn "$(t warn_not_apple_silicon)"
+    else
+        pok "$(t ok_apple_silicon)"
+    fi
 
-# Check Apple Silicon
-if [[ "$(uname -m)" != "arm64" ]]; then
-    pwn "$(t warn_not_apple_silicon)"
+    if ! command -v docker &> /dev/null; then
+        perr "$(t err_docker)"
+        perr "$(t err_docker_dl)"
+        exit 1
+    fi
+
+    # Detect Docker environment
+    if command -v orb &> /dev/null; then
+        pok "OrbStack: OK"
+    elif docker context ls 2>/dev/null | grep -q orbstack; then
+        pok "OrbStack (context): OK"
+    else
+        pwn "$(t warn_docker_desktop)"
+    fi
+elif [[ "$PLATFORM" == "pi" ]]; then
+    # Pi checks
+    if [[ "$ARCH" != "aarch64" ]]; then
+        perr "$(t err_arch)"
+        exit 1
+    fi
+    pok "Arch: aarch64 (ARM64)"
+
+    MEM=$(free -m | awk '/Mem/{print $2}')
+    pok "RAM: ${MEM}MB"
+
+    DSK=$(df -BG "$HOME" | awk 'NR==2{gsub(/G/,"",$4);print $4}')
+    if [ "${DSK:-0}" -lt 8 ]; then
+        perr "$(t err_disk "$DSK")"
+        exit 1
+    fi
+    pok "Disk: ${DSK}GB"
 else
-    pok "$(t ok_apple_silicon)"
-fi
+    # VPS checks
+    pok "Arch: $ARCH"
 
-# Check Docker (OrbStack or Docker Desktop)
-if ! command -v docker &> /dev/null; then
-    perr "$(t err_docker)"
-    perr "$(t err_docker_dl)"
-    exit 1
-fi
+    MEM=$(free -m | awk '/Mem/{print $2}')
+    pok "RAM: ${MEM}MB"
 
-# Detect Docker environment
-if command -v orb &> /dev/null; then
-    pok "OrbStack: OK"
-elif docker context ls 2>/dev/null | grep -q orbstack; then
-    pok "OrbStack (context): OK"
-else
-    pwn "$(t warn_docker_desktop)"
+    DSK=$(df -BG "$HOME" | awk 'NR==2{gsub(/G/,"",$4);print $4}')
+    if [ "${DSK:-0}" -lt 8 ]; then
+        perr "$(t err_disk "$DSK")"
+        exit 1
+    fi
+    pok "Disk: ${DSK}GB"
 fi
-
-# Check Docker Compose
-if ! docker compose version &> /dev/null; then
-    perr "$(t err_compose)"
-    exit 1
-fi
-pok "Docker Compose: OK"
 
 # Dependencies
 for c in openssl python3 curl; do
@@ -374,21 +472,61 @@ done
 pok "Dependencies: OK"
 
 # ========================================
-# Step 2: Directory
+# Step 2: System Setup & Docker
 # ========================================
 echo ""
 echo "$(t step2)"
 
-INSTALL_DIR="$HOME/lobehub-mac"
-mkdir -p "$INSTALL_DIR"
-cd "$INSTALL_DIR"
-pok "$(t ok_dir "$INSTALL_DIR")"
+if [[ "$PLATFORM" == "pi" ]]; then
+    # Configure swap (Pi-specific)
+    if command -v dphys-swapfile &>/dev/null; then
+        CS=$(grep 'CONF_SWAPSIZE=' /etc/dphys-swapfile 2>/dev/null | cut -d= -f2)
+        if [ "${CS:-0}" -lt 2048 ]; then
+            sudo dphys-swapfile swapoff 2>/dev/null || true
+            sudo sed -i 's/CONF_SWAPSIZE=.*/CONF_SWAPSIZE=2048/' /etc/dphys-swapfile
+            sudo dphys-swapfile setup && sudo dphys-swapfile swapon
+            pok "$(t ok_swap "2048MB")"
+        else
+            pok "$(t ok_swap "${CS}MB (OK)")"
+        fi
+    fi
+fi
+
+if [[ "$PLATFORM" != "mac" ]]; then
+    # Linux: Install Docker if needed
+    if ! command -v docker &>/dev/null; then
+        pok "Installing Docker..."
+        curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+        sudo sh /tmp/get-docker.sh && rm -f /tmp/get-docker.sh
+        sudo usermod -aG docker "$USER"
+        pwn "$(t warn_logout)"
+    else
+        pok "Docker: OK"
+    fi
+
+    # Install Docker Compose plugin if needed
+    if ! docker compose version &>/dev/null 2>&1; then
+        sudo apt-get update -qq && sudo apt-get install -y -qq docker-compose-plugin 2>/dev/null || true
+    fi
+else
+    # macOS: Docker Compose check
+    if ! docker compose version &> /dev/null; then
+        perr "$(t err_compose)"
+        exit 1
+    fi
+fi
+pok "Docker Compose: OK"
 
 # ========================================
-# Step 3: Generate Secrets & Save to .env
+# Step 3: Directory & Secrets
 # ========================================
 echo ""
 echo "$(t step3)"
+
+INSTALL_DIR="$HOME/self-hosted/lobehub"
+mkdir -p "$INSTALL_DIR"
+cd "$INSTALL_DIR"
+pok "Directory: $INSTALL_DIR"
 
 # Preserve existing secrets if .env exists
 if [ -f .env ]; then
@@ -413,18 +551,14 @@ if [ -z "${JWKS_KEY:-}" ]; then
     TMP_PEM=$(mktemp)
     openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$TMP_PEM" 2>/dev/null
 
-    JWKS_KEY=$(python3 << PYEOF
-import subprocess, json, base64, secrets, re
-
+    JWKS_KEY=$(python3 -c "
+import subprocess,json,base64,secrets,re
 def b64u(n):
-    l = (n.bit_length() + 7) // 8
-    return base64.urlsafe_b64encode(n.to_bytes(l, 'big')).rstrip(b'=').decode()
-
-r = subprocess.run(['openssl', 'rsa', '-in', '$TMP_PEM', '-text', '-noout'], capture_output=True, text=True)
-t = r.stdout
-
-def xh(f):
-    m = re.search(f + r':\s*\n([\s0-9a-f:]+)', t, re.DOTALL)
+    b = n.to_bytes((n.bit_length()+7)//8, 'big')
+    return base64.urlsafe_b64encode(b).rstrip(b'=').decode()
+t = subprocess.check_output(['openssl','rsa','-in','$TMP_PEM','-text','-noout'],stderr=subprocess.DEVNULL).decode()
+def xh(label):
+    m = re.search(label + r':\s*\n((?:\s+[0-9a-f:]+\n?)+)', t)
     return int(m.group(1).replace(' ', '').replace('\n', '').replace(':', ''), 16) if m else 0
 
 em = re.search(r'publicExponent:\s*(\d+)', t)
@@ -441,13 +575,14 @@ kid = secrets.token_hex(8)
 jwk = {
     'kty': 'RSA', 'use': 'sig', 'alg': 'RS256', 'kid': kid,
     'n': b64u(n), 'e': b64u(e), 'd': b64u(d),
-    'p': b64u(p), 'q': b64u(q), 'dp': b64u(dp), 'dq': b64u(dq), 'qi': b64u(qi)
+    'p': b64u(p), 'q': b64u(q),
+    'dp': b64u(dp), 'dq': b64u(dq), 'qi': b64u(qi)
 }
 print(json.dumps({'keys': [jwk]}, separators=(',', ':')))
-PYEOF
-)
+")
     rm -f "$TMP_PEM"
-    pok "JWKS Key: OK"
+else
+    pok "JWKS Key: reused"
 fi
 
 # Generate SearXNG secret
@@ -475,7 +610,6 @@ else
     S3_SERVICE="rustfs"
     S3_SERVICE_NAME="RustFS"
 fi
-
 pok "$(t ok_s3_choice "$S3_SERVICE_NAME")"
 
 # ========================================
@@ -486,9 +620,10 @@ echo "$(t step5)"
 
 cat > .env << ENVEOF
 # =================================================================
-# LobeHub v3.0 - Configuration & Secrets
+# LobeHub v4.0 - Configuration & Secrets
 $(t env_warning)
 # Generated: $(date '+%Y-%m-%d %H:%M:%S')
+# Platform: $PLATFORM_LABEL
 # Network mode: $NETWORK_MODE ($LAN_IP)
 # =================================================================
 
@@ -504,13 +639,15 @@ AUTH_SECRET=$AUTH_SECRET
 KEY_VAULTS_SECRET=$KEY_VAULTS_SECRET
 JWKS_KEY=$JWKS_KEY
 
-# Database (PostgreSQL + ParadeDB)
+# Database (PostgreSQL)
 LOBE_DB_NAME=lobechat
 POSTGRES_PASSWORD=$POSTGRES_PASSWORD
 
-# S3 Storage ($S3_SERVICE_NAME)
+# S3 Storage
 RUSTFS_ACCESS_KEY=$RUSTFS_ACCESS_KEY
 RUSTFS_SECRET_KEY=$RUSTFS_SECRET_KEY
+RUSTFS_LOBE_BUCKET=lobe
+S3_PUBLIC_DOMAIN=$S3_PUBLIC_ENDPOINT
 S3_ACCESS_KEY=$S3_ACCESS_KEY
 S3_SECRET_KEY=$S3_SECRET_KEY
 S3_ENDPOINT=$S3_PUBLIC_ENDPOINT
@@ -518,6 +655,12 @@ RUSTFS_LOBE_BUCKET=lobe
 
 # S3 Storage choice
 S3_SERVICE=$S3_SERVICE
+
+# AI Keys (uncomment to enable)
+# OPENAI_API_KEY=sk-xxx
+# ANTHROPIC_API_KEY=sk-ant-xxx
+# GOOGLE_API_KEY=xxx
+# OLLAMA_PROXY_URL=http://host.docker.internal:11434
 ENVEOF
 
 pok "$(t ok_env_saved)"
@@ -528,31 +671,28 @@ pok "$(t ok_env_saved)"
 echo ""
 echo "$(t step6)"
 
-# Bucket policy - READ ONLY public (compatible with both MinIO and RustFS)
+# Create bucket policy JSON
 cat > bucket.config.json << 'BUCKETEOF'
 {
-  "Version": "2012-10-17",
   "Statement": [
     {
       "Effect": "Allow",
-      "Principal": {"AWS": ["*"]},
+      "Principal": { "AWS": ["*"] },
       "Action": ["s3:GetObject"],
-      "Resource": ["arn:aws:s3:::lobe/*"]
+      "Resource": ["arn:aws:s3:::*"]
     }
-  ]
+  ],
+  "Version": "2012-10-17"
 }
 BUCKETEOF
+pok "bucket.config.json: OK"
 
-pok "bucket.config.json: OK (read-only public)"
-
-# SearXNG Settings - download official config from LobeHub repo
-pok "$(t ok_searxng_dl)"
+# Download SearXNG settings
 SEARXNG_URL="https://raw.githubusercontent.com/lobehub/lobe-chat/HEAD/docker-compose/deploy/searxng-settings.yml"
 if curl -sfL "$SEARXNG_URL" -o searxng-settings.yml; then
     pok "searxng-settings.yml: OK (official LobeHub config)"
 else
     pwn "$(t warn_searxng_fallback)"
-    # Fallback: generate minimal valid config
     cat > searxng-settings.yml << SEARXNGEOF
 use_default_settings: true
 
@@ -562,10 +702,13 @@ general:
 
 search:
   safe_search: 0
-  autocomplete: 'google'
-  formats:
-    - html
-    - json
+  autocomplete: ""
+  default_lang: ""
+
+engines:
+  - name: google
+    engine: google
+    shortcut: g
 
 server:
   port: 8080
@@ -584,33 +727,85 @@ fi
 echo ""
 echo "$(t step7)"
 
-if [[ "$S3_SERVICE" == "rustfs" ]]; then
-# ---- RustFS Docker Compose ----
-cat > docker-compose.yml << 'DCOMPOSE'
-name: lobehub-mac
+# Determine platform-specific settings
+if [[ "$PLATFORM" == "pi" ]]; then
+    PG_IMAGE="pgvector/pgvector:pg16"
+    ALPINE_IMAGE="alpine:3.20"
+    PG_LABEL="pgvector"
+else
+    PG_IMAGE="paradedb/paradedb:latest-pg17"
+    ALPINE_IMAGE="alpine"
+    PG_LABEL="ParadeDB"
+fi
+
+# Extra hosts for Linux (needed for host.docker.internal)
+if [[ "$PLATFORM" == "mac" ]]; then
+    EXTRA_HOSTS=""
+else
+    EXTRA_HOSTS="    extra_hosts:
+      - \"host.docker.internal:host-gateway\""
+fi
+
+# Memory limits for Pi
+if [[ "$PLATFORM" == "pi" ]]; then
+    PG_DEPLOY="    deploy:
+      resources:
+        limits:
+          memory: 1024M
+        reservations:
+          memory: 256M"
+    REDIS_CMD="redis-server --save 60 1000 --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru"
+    REDIS_DEPLOY="    deploy:
+      resources:
+        limits:
+          memory: 192M"
+    SEARXNG_DEPLOY="    deploy:
+      resources:
+        limits:
+          memory: 256M"
+    LOBE_DEPLOY="    deploy:
+      resources:
+        limits:
+          memory: 2048M
+        reservations:
+          memory: 512M"
+    SEARXNG_VOL_RO=":ro"
+else
+    PG_DEPLOY=""
+    REDIS_CMD="redis-server --save 60 1000 --appendonly yes"
+    REDIS_DEPLOY=""
+    SEARXNG_DEPLOY=""
+    LOBE_DEPLOY=""
+    SEARXNG_VOL_RO=""
+fi
+
+# ---- Generate docker-compose.yml ----
+cat > docker-compose.yml << DCOMPOSE
+name: lobehub
 
 services:
   network-service:
-    image: alpine
+    image: $ALPINE_IMAGE
     container_name: lobe-network
     restart: always
     ports:
-      - '${LOBE_PORT:-3210}:3210'
-      - '${RUSTFS_PORT:-9000}:9000'
+      - '\${LOBE_PORT:-3210}:3210'
+      - '\${RUSTFS_PORT:-9000}:9000'
       - '9001:9001'
+$EXTRA_HOSTS
     command: tail -f /dev/null
     networks:
       - lobe-network
 
   postgresql:
-    image: paradedb/paradedb:latest-pg17
-    container_name: lobe-mac-postgres
+    image: $PG_IMAGE
+    container_name: lobe-postgres
     restart: always
     volumes:
-      - ./data:/var/lib/postgresql/data
+      - pg_data:/var/lib/postgresql/data
     environment:
-      - POSTGRES_DB=${LOBE_DB_NAME:-lobechat}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=\${LOBE_DB_NAME:-lobechat}
+      - POSTGRES_PASSWORD=\${POSTGRES_PASSWORD}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -618,12 +813,13 @@ services:
       retries: 10
     networks:
       - lobe-network
+$PG_DEPLOY
 
   redis:
     image: redis:7-alpine
-    container_name: lobe-mac-redis
+    container_name: lobe-redis
     restart: always
-    command: redis-server --save 60 1000 --appendonly yes
+    command: $REDIS_CMD
     volumes:
       - redis_data:/data
     healthcheck:
@@ -633,10 +829,16 @@ services:
       retries: 5
     networks:
       - lobe-network
+$REDIS_DEPLOY
 
+DCOMPOSE
+
+# Add S3 service
+if [[ "$S3_SERVICE" == "rustfs" ]]; then
+cat >> docker-compose.yml << 'DCOMPOSE'
   rustfs:
     image: rustfs/rustfs:latest
-    container_name: lobe-mac-rustfs
+    container_name: lobe-rustfs
     network_mode: "service:network-service"
     environment:
       - RUSTFS_CONSOLE_ENABLE=true
@@ -654,7 +856,7 @@ services:
 
   rustfs-init:
     image: minio/mc:latest
-    container_name: lobe-mac-rustfs-init
+    container_name: lobe-rustfs-init
     depends_on:
       rustfs:
         condition: service_healthy
@@ -672,122 +874,18 @@ services:
     networks:
       - lobe-network
 
-  searxng:
-    image: searxng/searxng
-    container_name: lobe-mac-searxng
-    restart: always
-    volumes:
-      - ./searxng-settings.yml:/etc/searxng/settings.yml
-    environment:
-      - SEARXNG_SETTINGS_FILE=/etc/searxng/settings.yml
-    networks:
-      - lobe-network
-
-  lobe:
-    image: lobehub/lobehub:latest
-    container_name: lobe-mac-app
-    network_mode: "service:network-service"
-    restart: always
-    depends_on:
-      postgresql:
-        condition: service_healthy
-      network-service:
-        condition: service_started
-      rustfs:
+DCOMPOSE
+    S3_INIT_SVC="rustfs-init"
+    S3_SVC="rustfs"
+    S3_DEPENDS="      rustfs:
         condition: service_healthy
       rustfs-init:
-        condition: service_completed_successfully
-      redis:
-        condition: service_healthy
-    environment:
-      # Auth
-      - AUTH_SECRET=${AUTH_SECRET}
-      - KEY_VAULTS_SECRET=${KEY_VAULTS_SECRET}
-      # Database
-      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@postgresql:5432/${LOBE_DB_NAME:-lobechat}
-      # Redis
-      - REDIS_URL=redis://redis:6379
-      - REDIS_PREFIX=lobechat
-      - REDIS_TLS=0
-      # S3 Storage (RustFS via internal network)
-      - S3_BUCKET=${RUSTFS_LOBE_BUCKET:-lobe}
-      - S3_ENABLE_PATH_STYLE=1
-      - S3_ACCESS_KEY=${RUSTFS_ACCESS_KEY}
-      - S3_ACCESS_KEY_ID=${RUSTFS_ACCESS_KEY}
-      - S3_SECRET_ACCESS_KEY=${RUSTFS_SECRET_KEY}
-      - S3_SET_ACL=0
-      - S3_PROXY=1
-      # Image Vision
-      - LLM_VISION_IMAGE_USE_BASE64=1
-      # Online Search (SearXNG)
-      - SEARXNG_URL=http://searxng:8080
-      - SEARCH_PROVIDERS=searxng
-      - CRAWLER_IMPLS=naive
-    env_file:
-      - .env
-
-volumes:
-  redis_data:
-  rustfs_data:
-
-networks:
-  lobe-network:
-    driver: bridge
-DCOMPOSE
-
+        condition: service_completed_successfully"
 else
-# ---- MinIO Docker Compose ----
-cat > docker-compose.yml << 'DCOMPOSE'
-name: lobehub-mac
-
-services:
-  network-service:
-    image: alpine
-    container_name: lobe-network
-    restart: always
-    ports:
-      - '${LOBE_PORT:-3210}:3210'
-      - '${RUSTFS_PORT:-9000}:9000'
-      - '9001:9001'
-    command: tail -f /dev/null
-    networks:
-      - lobe-network
-
-  postgresql:
-    image: paradedb/paradedb:latest-pg17
-    container_name: lobe-mac-postgres
-    restart: always
-    volumes:
-      - ./data:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_DB=${LOBE_DB_NAME:-lobechat}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    networks:
-      - lobe-network
-
-  redis:
-    image: redis:7-alpine
-    container_name: lobe-mac-redis
-    restart: always
-    command: redis-server --save 60 1000 --appendonly yes
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-    networks:
-      - lobe-network
-
+cat >> docker-compose.yml << 'DCOMPOSE'
   minio:
     image: minio/minio:latest
-    container_name: lobe-mac-minio
+    container_name: lobe-minio
     network_mode: "service:network-service"
     environment:
       - MINIO_ROOT_USER=${S3_ACCESS_KEY}
@@ -804,7 +902,7 @@ services:
 
   minio-init:
     image: minio/mc:latest
-    container_name: lobe-mac-minio-init
+    container_name: lobe-minio-init
     depends_on:
       minio:
         condition: service_healthy
@@ -822,20 +920,36 @@ services:
     networks:
       - lobe-network
 
+DCOMPOSE
+    S3_INIT_SVC="minio-init"
+    S3_SVC="minio"
+    S3_DEPENDS="      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully"
+fi
+
+# Add SearXNG
+cat >> docker-compose.yml << DCOMPOSE
   searxng:
-    image: searxng/searxng
-    container_name: lobe-mac-searxng
+    image: searxng/searxng:latest
+    container_name: lobe-searxng
     restart: always
     volumes:
-      - ./searxng-settings.yml:/etc/searxng/settings.yml
+      - ./searxng-settings.yml:/etc/searxng/settings.yml${SEARXNG_VOL_RO}
     environment:
       - SEARXNG_SETTINGS_FILE=/etc/searxng/settings.yml
     networks:
       - lobe-network
+$SEARXNG_DEPLOY
 
+DCOMPOSE
+
+# Add LobeHub app
+cat >> docker-compose.yml << DCOMPOSE
   lobe:
     image: lobehub/lobehub:latest
-    container_name: lobe-mac-app
+    container_name: lobe-app
     network_mode: "service:network-service"
     restart: always
     depends_on:
@@ -843,28 +957,25 @@ services:
         condition: service_healthy
       network-service:
         condition: service_started
-      minio:
-        condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
+$S3_DEPENDS
       redis:
         condition: service_healthy
     environment:
       # Auth
-      - AUTH_SECRET=${AUTH_SECRET}
-      - KEY_VAULTS_SECRET=${KEY_VAULTS_SECRET}
+      - AUTH_SECRET=\${AUTH_SECRET}
+      - KEY_VAULTS_SECRET=\${KEY_VAULTS_SECRET}
       # Database
-      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@postgresql:5432/${LOBE_DB_NAME:-lobechat}
+      - DATABASE_URL=postgresql://postgres:\${POSTGRES_PASSWORD}@postgresql:5432/\${LOBE_DB_NAME:-lobechat}
       # Redis
       - REDIS_URL=redis://redis:6379
       - REDIS_PREFIX=lobechat
       - REDIS_TLS=0
-      # S3 Storage (MinIO via internal network)
-      - S3_BUCKET=lobe
+      # S3 Storage (via internal network)
+      - S3_BUCKET=\${RUSTFS_LOBE_BUCKET:-lobe}
       - S3_ENABLE_PATH_STYLE=1
-      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
-      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY}
-      - S3_SECRET_ACCESS_KEY=${S3_SECRET_KEY}
+      - S3_ACCESS_KEY=\${RUSTFS_ACCESS_KEY}
+      - S3_ACCESS_KEY_ID=\${RUSTFS_ACCESS_KEY}
+      - S3_SECRET_ACCESS_KEY=\${RUSTFS_SECRET_KEY}
       - S3_SET_ACL=0
       - S3_PROXY=1
       # Image Vision
@@ -875,8 +986,26 @@ services:
       - CRAWLER_IMPLS=naive
     env_file:
       - .env
+$LOBE_DEPLOY
 
+DCOMPOSE
+
+# Volumes
+if [[ "$S3_SERVICE" == "rustfs" ]]; then
+cat >> docker-compose.yml << 'DCOMPOSE'
 volumes:
+  pg_data:
+  redis_data:
+  rustfs_data:
+
+networks:
+  lobe-network:
+    driver: bridge
+DCOMPOSE
+else
+cat >> docker-compose.yml << 'DCOMPOSE'
+volumes:
+  pg_data:
   redis_data:
   minio_data:
 
@@ -884,7 +1013,6 @@ networks:
   lobe-network:
     driver: bridge
 DCOMPOSE
-
 fi
 
 pok "Docker Compose: OK ($S3_SERVICE_NAME + SearXNG)"
@@ -903,7 +1031,7 @@ docker compose down 2>/dev/null || true
 
 # Pull images
 pok "$(t ok_pull)"
-docker compose pull
+docker compose pull 2>&1 | tail -8 || pwn "Will pull on start"
 
 # Start infrastructure first
 pok "$(t ok_start_infra)"
@@ -912,7 +1040,7 @@ docker compose up -d network-service postgresql redis searxng
 # Wait for PostgreSQL
 pok "$(t ok_wait_pg)"
 for i in {1..60}; do
-    if docker exec lobe-mac-postgres pg_isready -U postgres &>/dev/null; then
+    if docker exec lobe-postgres pg_isready -U postgres &>/dev/null; then
         pok "$(t ok_pg_ready)"
         break
     fi
@@ -923,7 +1051,7 @@ done
 # Wait for Redis
 pok "$(t ok_wait_redis)"
 for i in {1..30}; do
-    if docker exec lobe-mac-redis redis-cli ping &>/dev/null; then
+    if docker exec lobe-redis redis-cli ping &>/dev/null; then
         pok "$(t ok_redis_ready)"
         break
     fi
@@ -976,6 +1104,8 @@ for i in {1..120}; do
         break
     fi
     [ $i -eq 120 ] && pwn "$(t warn_lobe_slow)"
+    # Progress indicator every 30s
+    [ $((i % 15)) -eq 0 ] && pok "Starting... (${i}s)"
     sleep 2
 done
 
@@ -987,8 +1117,8 @@ echo "$(t step9)"
 
 ALL_OK=true
 
-docker exec lobe-mac-postgres pg_isready -U postgres &>/dev/null && pok "PostgreSQL (ParadeDB): OK" || { perr "$(t err_pg_verify)"; ALL_OK=false; }
-docker exec lobe-mac-redis redis-cli ping &>/dev/null && pok "Redis: OK" || { perr "$(t err_redis_verify)"; ALL_OK=false; }
+docker exec lobe-postgres pg_isready -U postgres &>/dev/null && pok "PostgreSQL ($PG_LABEL): OK" || { perr "$(t err_pg_verify)"; ALL_OK=false; }
+docker exec lobe-redis redis-cli ping &>/dev/null && pok "Redis: OK" || { perr "$(t err_redis_verify)"; ALL_OK=false; }
 
 if [[ "$S3_SERVICE" == "rustfs" ]]; then
     curl -sf http://localhost:9000/health &>/dev/null && pok "RustFS: OK" || { perr "$(t err_rustfs_verify)"; ALL_OK=false; }
@@ -999,7 +1129,7 @@ fi
 # Test SearXNG
 SEARXNG_OK=false
 for i in {1..10}; do
-    if docker exec lobe-mac-searxng wget -qO- http://localhost:8080 &>/dev/null; then
+    if docker exec lobe-searxng wget -qO- http://localhost:8080 &>/dev/null; then
         pok "SearXNG: OK"
         SEARXNG_OK=true
         break
@@ -1022,7 +1152,7 @@ echo "$(t step10)"
 # Create helper script
 cat > lobe.sh << 'SCRIPTEOF'
 #!/bin/bash
-# LobeHub Helper Script v3.0
+# LobeHub Helper Script v4.0
 
 cd "$(dirname "$0")"
 
@@ -1058,7 +1188,7 @@ case "$1" in
   search-test)
     echo "🔍 Testing SearXNG..."
     QUERY="${2:-test}"
-    RESULT=$(docker exec lobe-mac-searxng wget -qO- "http://localhost:8080/search?q=${QUERY}&format=json" 2>/dev/null)
+    RESULT=$(docker exec lobe-searxng wget -qO- "http://localhost:8080/search?q=${QUERY}&format=json" 2>/dev/null)
     if echo "$RESULT" | grep -q '"results"'; then
       echo "✅ SearXNG OK! Search working."
       echo "$RESULT" | python3 -m json.tool 2>/dev/null | head -20
@@ -1088,7 +1218,7 @@ case "$1" in
     echo "Console: http://localhost:9001"
     ;;
   *)
-    echo "LobeHub Helper v3.0"
+    echo "LobeHub Helper v4.0"
     echo ""
     echo "Usage: ./lobe.sh {command}"
     echo ""
@@ -1120,6 +1250,7 @@ else
     echo -e "${YELLOW}  $(t finish_warn)${NC}"
 fi
 echo ""
+echo -e "  Platform:         ${CYAN}${PLATFORM_LABEL}${NC}"
 echo -e "  LobeHub:          ${PURPLE}${APP_URL}${NC}"
 echo -e "  S3 Console:       ${PURPLE}http://${LAN_IP}:9001${NC}"
 echo -e "  S3 User:          $RUSTFS_ACCESS_KEY"
@@ -1147,6 +1278,7 @@ echo "$(t feat_artifacts)"
 echo "$(t feat_vision)"
 echo "$(t feat_memory)"
 echo "$(t feat_crawl)"
+echo "$(t feat_auth)"
 echo ""
 echo -e "${YELLOW}$(t important_title)${NC}"
 echo "$(t important_env)"
@@ -1174,7 +1306,7 @@ echo "  • Start:          ./lobe.sh start"
 echo "  • Test search:    ./lobe.sh search-test"
 echo "  • Full reset:     ./lobe.sh reset"
 echo ""
-echo "Support: https://vnrom.net"
+echo "Support: https://ai.vnrom.net"
 echo ""
 echo "$(t notes_title)"
 echo "$(t note_1)"

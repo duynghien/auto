@@ -22,15 +22,25 @@ lib-cov/
 !**/.env.example
 !**/.env.test.example
 
-# Local Data & Storage
+# Local Data & Storage (Generic)
 **/storage/
 **/data/
-**/postgres-data/
-**/redis-data/
-**/minio-data/
-**/searxng-data/
 **/backups/
+**/db/
+**/ssl/
 
+# Project Specific Data (Bind Mounts)
+npm_data/
+npm_letsencrypt/
+caddy_data/
+caddy_config/
+minio-data/
+postgres-data/
+redis-data/
+searxng-data/
+n8n_data/
+lobe-data/
+mcp_backups/
 
 # AI Agents & Context (Prevent leaking internal instructions)
 .claude/
@@ -75,15 +85,20 @@ lerna-debug.log*
 
 # Docker & Local Config
 docker-compose.override.yml
-
-# Checksums & Data
 *.bak
 *.tmp
-*.swp
 
-# AnyCrawl Deployment Specifics
+# Project Specific Ignored Sources
 **/anycrawl-source/
+**/crawl4ai-source/
 **/test_lobehub.sh
 **/searxng/settings.yml.bak
 **/searxng/__pycache__/
 
+# Generated Docker Compose (Dynamic)
+lobehub/docker-compose.yml
+proxies/docker-compose.yml
+proxies/Caddyfile
+
+# Temp
+temp/

@@ -267,10 +267,7 @@ install_deps() {
 create_dirs() {
     step "5/12 — Creating Directories"
     
-    local BASE_DIR="/opt/openclaw"
-    if [[ "$OS" == "macos" ]]; then
-        BASE_DIR="$HOME/openclaw"
-    fi
+    local BASE_DIR="$HOME/self-hosted/openclaw"
     
     export INSTALL_DIR="$BASE_DIR"
     export OPENCLAW_HOME="${INSTALL_DIR}/data"
@@ -591,7 +588,7 @@ docker logs --tail 50 <container_name>
 
 ## Restart a Service
 ```bash
-cd /opt/openclaw && docker compose restart <service_name>
+cd ${INSTALL_DIR} && docker compose restart <service_name>
 ```
 SYSEOF
     
