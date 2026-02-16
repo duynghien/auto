@@ -19,11 +19,9 @@ A unified setup script for managing Reverse Proxies on **macOS**, **Raspberry Pi
 ### Installation
 
 ```bash
-# Clone repo
-mkdir -p ~/self-hosted
-cd ~/self-hosted
-git clone https://github.com/duynghien/auto.git
-cd auto/proxies
+# Create directory and download script
+mkdir -p ~/self-hosted/proxies && cd ~/self-hosted/proxies
+curl -O https://raw.githubusercontent.com/duynghien/auto/main/proxies/setup.sh
 
 # Run setup
 chmod +x setup.sh
@@ -73,11 +71,9 @@ Script cài đặt Proxy đa năng cho **macOS**, **Raspberry Pi**, và **VPS**.
 ### Cài đặt
 
 ```bash
-# Tải mã nguồn
-mkdir -p ~/self-hosted
-cd ~/self-hosted
-git clone https://github.com/duynghien/auto.git
-cd auto/proxies
+# Tạo thư mục và tải script
+mkdir -p ~/self-hosted/proxies && cd ~/self-hosted/proxies
+curl -O https://raw.githubusercontent.com/duynghien/auto/main/proxies/setup.sh
 
 # Chạy cài đặt
 chmod +x setup.sh

@@ -11,11 +11,9 @@ A unified toolkit for setting up **Docker**, **Portainer**, and **System Optimiz
 ### Installation
 
 ```bash
-# Clone repo
-mkdir -p ~/self-hosted
-cd ~/self-hosted
-git clone https://github.com/duynghien/auto.git
-cd auto/raspberry-pi
+# Create directory and download script
+mkdir -p ~/self-hosted/raspberry-pi && cd ~/self-hosted/raspberry-pi
+curl -O https://raw.githubusercontent.com/duynghien/auto/main/raspberry-pi/setup.sh
 
 # Run setup
 chmod +x setup.sh
@@ -41,11 +39,9 @@ Bộ công cụ cài đặt tự động cho **Raspberry Pi 4/5** (hệ điều 
 ### Cài đặt
 
 ```bash
-# Tải mã nguồn
-mkdir -p ~/self-hosted
-cd ~/self-hosted
-git clone https://github.com/duynghien/auto.git
-cd auto/raspberry-pi
+# Tạo thư mục và tải script
+mkdir -p ~/self-hosted/raspberry-pi && cd ~/self-hosted/raspberry-pi
+curl -O https://raw.githubusercontent.com/duynghien/auto/main/raspberry-pi/setup.sh
 
 # Chạy script
 chmod +x setup.sh

@@ -28,8 +28,11 @@ One-script installer for LobeHub with all features enabled. Auto-detects your pl
 ### Quick Install
 
 ```bash
-git clone https://github.com/duynghien/auto.git
-cd auto/lobehub
+# Create directory and download script
+mkdir -p ~/self-hosted/lobehub && cd ~/self-hosted/lobehub
+curl -O https://raw.githubusercontent.com/duynghien/auto/main/lobehub/setup.sh
+
+# Run setup
 chmod +x setup.sh
 ./setup.sh
 ```
@@ -136,8 +139,11 @@ Script cài đặt LobeHub tự động với đầy đủ tính năng. Tự nh�
 ### Cài đặt nhanh
 
 ```bash
-git clone https://github.com/duynghien/auto.git
-cd auto/lobehub
+# Tạo thư mục và tải script
+mkdir -p ~/self-hosted/lobehub && cd ~/self-hosted/lobehub
+curl -O https://raw.githubusercontent.com/duynghien/auto/main/lobehub/setup.sh
+
+# Chạy script
 chmod +x setup.sh
 ./setup.sh
 ```

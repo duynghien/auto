@@ -145,7 +145,7 @@ REDIS_URL="redis://postiz-redis:6379"
 # === Auth & Security ===
 JWT_SECRET="${JWT_SECRET}"
 IS_GENERAL="true"
-# DISABLE_REGISTRATION="false"
+DISABLE_REGISTRATION="false"
 API_LIMIT=300
 
 # === Storage Provider (Local by default) ===
