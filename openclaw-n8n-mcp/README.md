@@ -20,7 +20,7 @@ Automatic setup script for a **Super Agent** ecosystem — OpenClaw AI agent int
 | **Web Browsing** | Agent skill for web search & page reading | ✅ ON/OFF |
 | **Multi-model** | Support Anthropic, DeepSeek alongside OpenAI | ✅ ON/OFF |
 | **System Prompt** | Custom agent behavior instructions | ✅ ON/OFF |
-| **Security** | Caddy reverse proxy with auto SSL + network isolation | Always ON |
+| **Security** | Network isolation (requires external Proxy for SSL) | Always ON |
 | **Health Checks** | All containers monitored with auto-restart | Always ON |
 | **Helper Script** | `openclaw` CLI for easy management | Always ON |
 
@@ -66,6 +66,17 @@ The script guides you through:
 2. **Credential input** — API keys, domain/IP
 3. **Automatic build** — Docker images built from source
 4. **Service startup** — all containers launched with health checks
+
+### 🔌 Reverse Proxy Setup (Required for Public Access)
+
+This stack exposes n8n on port `5678` (internal). To access it securely from the internet (HTTPS), you need a Reverse Proxy.
+
+We provide a **Unified Proxy Setup** supporting:
+- **Cloudflare Tunnel** (Recommended - No open ports)
+- **Nginx Proxy Manager** (GUI)
+- **Caddy** (Simple CLI)
+
+👉 **[Click here to setup Proxy](../proxies/README.md)**
 
 ### ⚙️ Feature Toggles
 
@@ -124,7 +135,7 @@ openclaw env          # View environment (values hidden)
 │           ├── n8n-mcp/SKILL.md
 │           ├── web-browse/SKILL.md
 │           └── system-info/SKILL.md
-├── caddy/Caddyfile       # Reverse proxy config
+
 ├── src/                  # Source repos
 │   ├── openclaw/
 │   └── n8n-custom-mcp/
@@ -157,7 +168,7 @@ Script cài đặt tự động hệ sinh thái **Siêu Agent** — OpenClaw AI 
 | **Web Browsing** | Skill duyệt web, tìm kiếm thông tin | ✅ BẬT/TẮT |
 | **Multi-model** | Hỗ trợ Anthropic, DeepSeek bên cạnh OpenAI | ✅ BẬT/TẮT |
 | **System Prompt** | Tùy chỉnh hành vi agent | ✅ BẬT/TẮT |
-| **Security** | Caddy reverse proxy + SSL tự động + cô lập mạng | Luôn BẬT |
+| **Security** | Cô lập mạng (cần Proxy ngoài để có SSL) | Luôn BẬT |
 | **Health Checks** | Theo dõi & tự restart containers | Luôn BẬT |
 | **Helper Script** | CLI `openclaw` quản lý dễ dàng | Luôn BẬT |
 
@@ -179,6 +190,17 @@ Script sẽ hướng dẫn bạn qua:
 2. **Nhập thông tin** — API keys, domain/IP
 3. **Build tự động** — Docker images từ source
 4. **Khởi động** — tất cả containers với health checks
+
+### 🔌 Cài đặt Reverse Proxy (Bắt buộc để Public)
+
+Stack này chạy n8n ở port `5678` (nội bộ). Để truy cập từ Internet (HTTPS), bạn cần Reverse Proxy.
+
+Chúng tôi cung cấp bộ **Unified Proxy Setup** hỗ trợ:
+- **Cloudflare Tunnel** (Khuyên dùng - Không cần mở port)
+- **Nginx Proxy Manager** (Giao diện web)
+- **Caddy** (Đơn giản)
+
+👉 **[Xem hướng dẫn cài Proxy tại đây](../proxies/README.md)**
 
 ### ⚙️ Bật/Tắt tính năng
 
@@ -237,7 +259,7 @@ openclaw env          # Xem environment (ẩn giá trị)
 │           ├── n8n-mcp/SKILL.md
 │           ├── web-browse/SKILL.md
 │           └── system-info/SKILL.md
-├── caddy/Caddyfile       # Cấu hình reverse proxy
+
 ├── src/                  # Source repos
 │   ├── openclaw/
 │   └── n8n-custom-mcp/

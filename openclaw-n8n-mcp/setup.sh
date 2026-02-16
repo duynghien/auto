@@ -9,7 +9,6 @@ set -e
 #   - OpenClaw Gateway + Agent (full stack)
 #   - n8n Automation (Postgres, Redis, Worker)
 #   - n8n-custom-mcp (MCP bridge)
-#   - Caddy reverse proxy (auto SSL)
 #   - Feature toggle system
 #   - Health checks for all services
 #   - Optional: Watchtower, Auto-backup, Multi-model, Web Browsing
@@ -276,7 +275,6 @@ create_dirs() {
     
     mkdir -p "$INSTALL_DIR"
     mkdir -p "$OPENCLAW_HOME/workspace/skills/n8n-webhook"
-    mkdir -p "$CADDY_CONFIG"
     mkdir -p "${INSTALL_DIR}/backups"
     
     log "Directories created at: ${INSTALL_DIR}"
@@ -599,17 +597,7 @@ SYSEOF
 # CADDY
 ###############################################################################
 
-create_caddy_config() {
-    step "10/12 — Creating Caddy Configuration"
-    
-    cat > "${CADDY_CONFIG}/Caddyfile" << CADDYEOF
-n8n.${DOMAIN_NAME} {
-    reverse_proxy n8n:5678
-}
-CADDYEOF
-    
-    log "Caddyfile created for n8n.${DOMAIN_NAME}"
-}
+
 
 ###############################################################################
 # ENV FILE + FEATURES FILE
@@ -696,7 +684,6 @@ networks:
     driver: bridge
 
 volumes:
-  caddy_data:
   n8n_data:
   postgres_data:
   mcp_backups:
@@ -737,25 +724,15 @@ COMPOSEFILE
       timeout: 10s
       retries: 3
 
-  # ── Caddy (Reverse Proxy + Auto SSL) ─────────────────────────
-  caddy:
-    image: caddy:2-alpine
-    container_name: caddy
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ${CADDY_CONFIG}/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-    networks:
-      - frontend
+
 
   # ── n8n (Main Instance) ──────────────────────────────────────
   n8n:
     image: n8nio/n8n:latest
     container_name: n8n
     restart: unless-stopped
+    ports:
+      - "5678:5678"
     environment:
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
@@ -1183,7 +1160,6 @@ main() {
     clone_n8n_mcp
     create_openclaw_config
     create_skills
-    create_caddy_config
     create_env_files
     create_docker_compose
     create_backup_script
