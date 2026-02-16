@@ -128,42 +128,108 @@ log "Secrets generated."
 step "4/5 — Creating Docker Compose & Environment"
 
 cat > .env <<EOF
-# Postiz Configuration
+# Postiz Configuration (v3.0)
 # Generated: $(date)
+# Reference: http://docs.postiz.com/configuration/reference
 
 # === Core ===
-MAIN_URL=${MAIN_URL}
-FRONTEND_URL=${MAIN_URL}
-NEXT_PUBLIC_BACKEND_URL=${MAIN_URL}/api
-BACKEND_INTERNAL_URL=http://localhost:3000
+MAIN_URL="${MAIN_URL}"
+FRONTEND_URL="${MAIN_URL}"
+NEXT_PUBLIC_BACKEND_URL="${MAIN_URL}/api"
+BACKEND_INTERNAL_URL="http://localhost:3000"
 
 # === Database ===
-DATABASE_URL=postgresql://postiz-user:${POSTGRES_PASSWORD}@postiz-postgres:5432/postiz-db-local
-REDIS_URL=redis://postiz-redis:6379
+DATABASE_URL="postgresql://postiz-user:${POSTGRES_PASSWORD}@postiz-postgres:5432/postiz-db-local"
+REDIS_URL="redis://postiz-redis:6379"
 
-# === Auth ===
-JWT_SECRET=${JWT_SECRET}
-IS_GENERAL=true
-DISABLE_REGISTRATION=false
+# === Auth & Security ===
+JWT_SECRET="${JWT_SECRET}"
+IS_GENERAL="true"
+# DISABLE_REGISTRATION="false"
+API_LIMIT=300
 
-# === Storage (Local) ===
-STORAGE_PROVIDER=local
-UPLOAD_DIRECTORY=/uploads
-NEXT_PUBLIC_UPLOAD_DIRECTORY=/uploads
+# === Storage Provider (Local by default) ===
+STORAGE_PROVIDER="local"
+UPLOAD_DIRECTORY="/uploads"
+NEXT_PUBLIC_UPLOAD_DIRECTORY="/uploads"
+
+# === Cloudflare R2 (Optional - Required for some features if not using local) ===
+# CLOUDFLARE_ACCOUNT_ID=""
+# CLOUDFLARE_ACCESS_KEY=""
+# CLOUDFLARE_SECRET_ACCESS_KEY=""
+# CLOUDFLARE_BUCKETNAME=""
+# CLOUDFLARE_BUCKET_URL=""
+# CLOUDFLARE_REGION="auto"
 
 # === Temporal ===
-TEMPORAL_ADDRESS=temporal:7233
+TEMPORAL_ADDRESS="temporal:7233"
 
-# === Social Media (Edit manually) ===
-# X_API_KEY=
-# X_API_SECRET=
-# LINKEDIN_CLIENT_ID=
-# LINKEDIN_CLIENT_SECRET=
-# ... (Add others — see https://docs.postiz.com/platforms/introduction)
+# === Social Media APIs ===
+X_API_KEY=""
+X_API_SECRET=""
+LINKEDIN_CLIENT_ID=""
+LINKEDIN_CLIENT_SECRET=""
+REDDIT_CLIENT_ID=""
+REDDIT_CLIENT_SECRET=""
+GITHUB_CLIENT_ID=""
+GITHUB_CLIENT_SECRET=""
+BEEHIIVE_API_KEY=""
+BEEHIIVE_PUBLICATION_ID=""
+LISTMONK_DOMAIN=""
+LISTMONK_USER=""
+LISTMONK_API_KEY=""
+LISTMONK_LIST_ID=""
+THREADS_APP_ID=""
+THREADS_APP_SECRET=""
+FACEBOOK_APP_ID=""
+FACEBOOK_APP_SECRET=""
+YOUTUBE_CLIENT_ID=""
+YOUTUBE_CLIENT_SECRET=""
+TIKTOK_CLIENT_ID=""
+TIKTOK_CLIENT_SECRET=""
+PINTEREST_CLIENT_ID=""
+PINTEREST_CLIENT_SECRET=""
+DRIBBBLE_CLIENT_ID=""
+DRIBBBLE_CLIENT_SECRET=""
+DISCORD_CLIENT_ID=""
+DISCORD_CLIENT_SECRET=""
+DISCORD_BOT_TOKEN_ID=""
+SLACK_ID=""
+SLACK_SECRET=""
+SLACK_SIGNING_SECRET=""
+MASTODON_URL="https://mastodon.social"
+MASTODON_CLIENT_ID=""
+MASTODON_CLIENT_SECRET=""
 
-# === Developer / Misc ===
+# === Chrome Extension ===
+EXTENSION_ID=""
+
+# === AI & Misc ===
+OPENAI_API_KEY=""
+NEXT_PUBLIC_DISCORD_SUPPORT=""
+NEXT_PUBLIC_POLOTNO=""
+
+# === Payments ===
+FEE_AMOUNT=0.05
+STRIPE_PUBLISHABLE_KEY=""
+STRIPE_SECRET_KEY=""
+STRIPE_SIGNING_KEY=""
+STRIPE_SIGNING_KEY_CONNECT=""
+
+# === OAuth / SSO ===
+NEXT_PUBLIC_POSTIZ_OAUTH_DISPLAY_NAME="Authentik"
+NEXT_PUBLIC_POSTIZ_OAUTH_LOGO_URL="https://raw.githubusercontent.com/walkxcode/dashboard-icons/master/png/authentik.png"
+POSTIZ_GENERIC_OAUTH="false"
+POSTIZ_OAUTH_URL="https://auth.example.com"
+POSTIZ_OAUTH_AUTH_URL="https://auth.example.com/application/o/authorize"
+POSTIZ_OAUTH_TOKEN_URL="https://auth.example.com/application/o/token"
+POSTIZ_OAUTH_USERINFO_URL="https://authentik.example.com/application/o/userinfo"
+POSTIZ_OAUTH_CLIENT_ID=""
+POSTIZ_OAUTH_CLIENT_SECRET=""
+# POSTIZ_OAUTH_SCOPE="openid profile email"
+
+# === Developer ===
 NX_ADD_PLUGINS=false
-API_LIMIT=300
 EOF
 
 log ".env file created."
