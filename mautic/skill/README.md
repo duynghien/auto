@@ -55,11 +55,15 @@ Bạn cần thực hiện các thao tác trên máy chủ đang chạy OpenClaw:
    ```
 
 3. **Khai báo cổng mở trong cấu hình OpenClaw:**
-   Dùng lệnh `nano ~/.openclaw/openclaw.json` (hoặc mở file này trong VSCode) và bổ sung mảng `hooks` như dưới đây vào cấp cao nhất của file JSON.
+   Dùng lệnh `nano ~/.openclaw/openclaw.json` (hoặc mở bằng trình soạn thảo) và **bổ sung thêm** mảng `mappings` vào bên trong object `"hooks"` có sẵn của bạn.
    
+   Bạn cần đảm bảo cấu trúc giống như sau (giữ nguyên biến `"internal"` đang có của bạn nếu có):
    ```json
    {
      "hooks": {
+       "internal": {
+         // ... Các thông số internal gốc của bạn giữ nguyên ...
+       },
        "enabled": true,
        "path": "/hooks",
        "mappings": [
@@ -73,11 +77,10 @@ Bạn cần thực hiện các thao tác trên máy chủ đang chạy OpenClaw:
            }
          }
        ]
-     },
-     // Các cấu hình cũ của OpenClaw (gateway, agents...) giữ nguyên.
+     }
    }
    ```
-   Sau khi lưu file, lệnh cho OpenClaw restart lại để nó nhận webhook: `/restart` trong cửa sổ chat hoặc chạy lại Gateway.
+   Sau khi lưu file, lệnh cho OpenClaw restart lại để nó nhận webhook: `/restart` trong cửa sổ chat hoặc khởi động lại tiến trình Gateway.
 
 ---
 
