@@ -94,6 +94,7 @@ docker-compose.override.yml
 **/test_lobehub.sh
 **/searxng/settings.yml.bak
 **/searxng/__pycache__/
+**/data/
 
 # Generated Docker Compose (Dynamic)
 lobehub/docker-compose.yml

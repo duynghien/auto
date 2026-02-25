@@ -1,113 +1,257 @@
-# Hướng Dẫn Kích Hoạt Mautic Skill Cho OpenClaw
+# Mautic Skill for OpenClaw — Hướng dẫn chuẩn (chi tiết, dễ làm theo)
 
-Cấu trúc OpenClaw Mautic Skill đã được tạo sẵn tại: `mautic/skill`.
+README này là bản **thực chiến** cho Mautic 7 + OpenClaw.
+Nó xử lý đúng trường hợp phổ biến: trong Mautic Webhook chỉ có **URL + Secret** (không thêm custom header được).
 
-Để kết nối hệ thống này, bạn cần thực hiện 2 bước cấu hình dưới đây.
+---
 
-## BƯỚC 1: Nạp Skill Vào OpenClaw
+## 0) Kiến trúc đúng (đừng bỏ qua)
 
-OpenClaw quản lý các kỹ năng (Skills) của Agent thông qua thư mục cấu hình chung. Hãy copy thư mục Mautic Skill vào thư mục `skills` của OpenClaw:
+Mautic không gọi trực tiếp OpenClaw hooks bằng Bearer token được (do UI hạn chế), nên dùng luồng:
+
+1. **Mautic Webhook** gửi payload + `Webhook-Signature` →
+2. **Bridge service** (`mautic_webhook_bridge.js`) verify chữ ký bằng secret Mautic →
+3. Bridge forward payload sang **OpenClaw hooks** (`/hooks/mautic`) với `Authorization: Bearer <OPENCLAW_HOOK_TOKEN>` →
+4. OpenClaw mapping + transform xử lý event
+
+> Nếu bridge không chạy nền, Mautic sẽ bắn webhook thất bại (connection refused/timeout).
+
+---
+
+## 1) Chuẩn bị skill
 
 ```bash
-# 1. Tạo thư mục skills trong thư mục cấu hình OpenClaw của bạn (nếu chưa có)
 mkdir -p ~/.openclaw/workspace/skills
-
-# 2. Copy toàn bộ thư mục mautic/skill vào đó
-cp -r ~/self-hosted/auto/mautic/skill ~/.openclaw/workspace/skills/mautic
-
-# 3. Cấp quyền thực thi cho script kết nối API
+# copy thư mục mautic vào ~/.openclaw/workspace/skills/mautic nếu chưa có
 chmod +x ~/.openclaw/workspace/skills/mautic/mautic_action.js
+chmod +x ~/.openclaw/workspace/skills/mautic/mautic_webhook_bridge.js
 ```
 
-Sau khi nạp, bạn cần bổ sung biến môi trường xác thực. Mở Terminal nơi định chạy OpenClaw và xuất 3 biến này (hoặc cấu hình thẳng vào `.env` của hệ thống chạy OpenClaw):
+---
+
+## 2) Env cho Mautic API actions (chat command)
+
+Set env trong môi trường chạy OpenClaw (hoặc `.env` tương ứng):
 
 ```bash
-export MAUTIC_BASE_URL="http://192.168.x.x:8080" # (Thay bằng IP/Domain Mautic của bạn)
-export MAUTIC_API_USER="admin"                   # Nhập Username API
-export MAUTIC_API_PASS="mat-khau-api"            # Nhập Password API
+MAUTIC_BASE_URL=http://<mautic-host>:8080
+MAUTIC_API_USER=<mautic_api_user>
+MAUTIC_API_PASS=<mautic_api_pass>
 ```
-> **Xác Thực (Rất Quan Trọng):** 
-> Kịch bản của OpenClaw đang sử dụng **Basic Auth** vì nó phù hợp nhất cho các tập lệnh chạy ngầm không có giao diện trình duyệt.
-> 1. Vào Mautic Settings 👉 *Configuration* 👉 *API Settings*. Bật **"API enabled"** và **"Enable HTTP basic auth"**, sau đó Save lại.
-> 3. Đối với Basic Auth, Mautic sử dụng chình **Username và Password đăng nhập** của người dùng. **LỜI KHUYÊN (Bảo Mật & Theo Dõi Lịch Sử):** Bạn **KHÔNG NÊN** dùng chung tài khoản Administrator cá nhân của bạn cho OpenClaw vì sẽ không thể phân biệt rạch ròi lịch sử hành động do bạn làm hay do AI làm, cũng như rất nguy hiểm nếu lộ mật khẩu. Thay vào đó:
->    * Tạo một chức vụ mới (Role) trong Mautic. Cấp các quyền sau:
->      - **API Permissions:** Đánh dấu *Granted*.
->      - **Contact Permissions:** Khuyên dùng check mục **Full** (Hoặc ít nhất là **View (Others)**, **Edit (Others)** và **Create**) cho thiết lập `Contacts` và `Segments`.
->      - **Point Permissions:** Tick chọn **Full**.
->      - **Tag manager permissions:** Tick chọn **Full**.
->    * Đi tới mục **Settings** ở góc phải trên cùng 👉 *Users* 👉 **New** để tạo một User mới (VD: Username là `openclaw_agent`, password ngẫu nhiên). Gán Role vừa tạo cho User này.
->    * Điền tài khoản `openclaw_agent` bạn vừa tạo vào 2 biến `MAUTIC_API_USER` và `MAUTIC_API_PASS` phía trên.
 
-## BƯỚC 2: Cấu Hình Webhook Trong OpenClaw
-
-Mautic thường gửi lượng lớn dữ liệu rất rắc rối qua Webhook. OpenClaw lại yêu cầu một cấu trúc JSON đơn giản. Vì vậy, ta cần "phiên dịch" dữ liệu từ Mautic sang cho LLM qua hệ thống "Transform" của OpenClaw.
-
-Bạn cần thực hiện các thao tác trên máy chủ đang chạy OpenClaw:
-
-1. **Khởi tạo thư mục Transform:**
-   ```bash
-   mkdir -p ~/.openclaw/hooks/transforms
-   ```
-2. **Copy file phiên dịch dữ liệu:**
-   Tôi đã chuẩn bị sẵn file `mautic_webhook_transform.js` trong thư mục cài đặt (`mautic/skill`). Hãy copy nó qua OpenClaw:
-   ```bash
-   cp ~/self-hosted/auto/mautic/skill/mautic_webhook_transform.js ~/.openclaw/hooks/transforms/
-   ```
-
-3. **Khai báo cổng mở trong cấu hình OpenClaw:**
-   Dùng lệnh `nano ~/.openclaw/openclaw.json` (hoặc mở bằng trình soạn thảo) và **bổ sung thêm** mảng `mappings` vào bên trong object `"hooks"` có sẵn của bạn.
-   
-   Bạn cần đảm bảo cấu trúc giống như sau (giữ nguyên biến `"internal"` đang có của bạn nếu có):
-   ```json
-   {
-     "hooks": {
-       "internal": {
-         // ... Các thông số internal gốc của bạn giữ nguyên ...
-       },
-       "enabled": true,
-       "path": "/hooks",
-       "mappings": [
-         {
-           "match": {
-             "source": "mautic"
-           },
-           "action": "agent",
-           "transform": {
-             "module": "mautic_webhook_transform.js"
-           }
-         }
-       ]
-     }
-   }
-   ```
-   Sau khi lưu file, lệnh cho OpenClaw restart lại để nó nhận webhook: `/restart` trong cửa sổ chat hoặc khởi động lại tiến trình Gateway.
+### Quyền user Mautic khuyến nghị
+Tạo user riêng cho agent (không dùng admin cá nhân), role gồm:
+- API permissions: Granted
+- Contacts: Full (hoặc View/Create/Edit)
+- Segments: Full
+- Tag manager: Full
+- Points: Full
 
 ---
 
-## BƯỚC 3: Tạo Webhook Trên Mautic 7
+## 3) Cấu hình OpenClaw hooks + mapping
 
-Cuối cùng, vào giao diện Mautic Dashboard để ra lệnh cho Mautic bắn tín hiệu qua OpenClaw.
+Mở `~/.openclaw/openclaw.json` và đảm bảo block `hooks` có đầy đủ:
 
-1. Vào Mautic Dashboard 👉 biểu tượng Settings (bánh răng) 👉 **Webhooks**.
-2. Bấm **New** ở góc phải trên.
-3. Điền các trường:
-   - **Name:** OpenClaw Trigger (AI Agent)
-   - **Webhook POST Url:** `http://127.0.0.1:18789/hooks/mautic` (Đây là cổng Gateway mặc định của OpenClaw vừa mở ở bước trên. Đổi IP nếu Mautic và OpenClaw khác máy chủ).
-4. Ở cột bên phải **Webhook Events**, đánh dấu check vào các sự kiện sau (Tránh rác!):
-   - **Form Submit Event:** (Rất quan trọng) Báo động có khách tìm đến.
-   - **Contact Identified Event:** Báo tên khách.
-   - **Contact Segment Membership Change Event:** (Tuỳ chọn)
-   - **Contact Points Changed Event:** (Tuỳ chọn)
-5. Bấm **Save & Close**.
+```json
+{
+  "hooks": {
+    "internal": {
+      "enabled": true,
+      "entries": {
+        "boot-md": { "enabled": true },
+        "bootstrap-extra-files": { "enabled": true },
+        "command-logger": { "enabled": true },
+        "session-memory": { "enabled": true }
+      }
+    },
+    "enabled": true,
+    "token": "<OPENCLAW_HOOK_TOKEN>",
+    "path": "/hooks",
+    "transformsDir": "~/.openclaw/hooks/transforms",
+    "mappings": [
+      {
+        "match": { "path": "mautic" },
+        "action": "agent",
+        "name": "Mautic Webhook",
+        "wakeMode": "now",
+        "transform": { "module": "mautic_webhook_transform.js" }
+      }
+    ]
+  }
+}
+```
+
+### Copy transform file đúng chỗ
+
+```bash
+mkdir -p ~/.openclaw/hooks/transforms
+cp ~/.openclaw/workspace/skills/mautic/mautic_webhook_transform.js ~/.openclaw/hooks/transforms/
+```
+
+### Cực kỳ quan trọng
+- `hooks.enabled=true` **bắt buộc** phải có `hooks.token`, thiếu sẽ fail startup.
+- `mautic_webhook_transform.js` phải export function trực tiếp:
+  - ✅ `module.exports = transform;`
+  - ❌ `module.exports = { transform };`
+
+Restart gateway:
+
+```bash
+openclaw gateway restart
+```
+
+Kiểm tra gateway port thực tế:
+
+```bash
+openclaw gateway status
+```
+
+> Mặc định thường là `18799` trên máy này.
 
 ---
 
-### 🎉 Test Thử Nghiệm
+## 4) Cấu hình bridge (Mautic Secret -> OpenClaw Bearer)
 
-Mở một channel OpenClaw lên (VD: Telegram hoặc Discord) và chat với nó. Hãy thử ra lệnh tự nhiên xem OpenClaw có tự gọi Mautic Skill không nhé:
+Set env cho bridge:
 
-> *"Tìm giúp tôi khách hàng có email alex@example.com trong Mautic xem họ đang có bao nhiêu điểm (points)."*
+```bash
+export MAUTIC_WEBHOOK_SECRET='<secret trong webhook Mautic>'
+export OPENCLAW_HOOK_TOKEN='<giá trị hooks.token trong openclaw.json>'
+export OPENCLAW_HOOK_URL='http://127.0.0.1:18799/hooks/mautic'
+export MAUTIC_BRIDGE_HOST='0.0.0.0'
+export MAUTIC_BRIDGE_PORT='18889'
+export MAUTIC_BRIDGE_PATH='/mautic-webhook'
+```
 
-> *"Tôi có một leads mới tên là Sarah, email sarah@test.com. Hãy tạo contact này trên mautic và cộng cho cô ấy 15 điểm ưu tiên."*
+Chạy bridge:
 
-> *"Khách hàng nguyen@gmail.com vừa được team Sale đánh giá cao, hãy vào Mautic thả contact này vào segment ID 5 giúp tôi."*
+```bash
+cd ~/.openclaw/workspace/skills/mautic
+node mautic_webhook_bridge.js
+```
+
+URL bridge để điền vào Mautic:
+
+```text
+http://<ip-openclaw-host>:18889/mautic-webhook
+```
+
+Ví dụ LAN:
+
+```text
+http://192.168.1.145:18889/mautic-webhook
+```
+
+---
+
+## 5) Cấu hình webhook trong Mautic
+
+Mautic → Settings → Webhooks → New:
+- Name: `OpenClaw Trigger (AI Agent)`
+- Webhook URL: `http://192.168.1.145:18889/mautic-webhook` (ví dụ)
+- Secret: nhập secret mạnh (dùng lại cho `MAUTIC_WEBHOOK_SECRET` ở bridge)
+
+Events nên bật (tránh spam):
+- Form Submit Event
+- Contact Identified Event
+- Contact Segment Membership Change Event (optional)
+- Contact Points Changed Event (optional)
+
+---
+
+## 6) Test nhanh từng lớp
+
+## 6.1 Test OpenClaw hooks trực tiếp
+
+```bash
+curl -X POST http://127.0.0.1:18799/hooks/mautic \
+  -H "Authorization: Bearer <OPENCLAW_HOOK_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"source":"mautic","lead":{"email":"test@example.com"}}'
+```
+
+Kỳ vọng: HTTP `202` + JSON có `runId`.
+
+## 6.2 Test bridge bằng payload giả lập Mautic
+
+Bridge yêu cầu header `Webhook-Signature` hợp lệ (HMAC SHA256 base64 theo raw body).
+
+Nếu signature đúng:
+- Bridge trả `200`
+- `forwardedStatus` nên là `202`
+
+## 6.3 Test script action Mautic
+
+```bash
+cd ~/.openclaw/workspace/skills/mautic
+node mautic_action.js get_contact '{"email":"test@example.com"}'
+```
+
+---
+
+## 7) Chạy bridge dưới dạng service (khuyến nghị)
+
+### macOS launchd (gợi ý)
+Tạo plist riêng để bridge tự chạy khi boot.
+
+Ví dụ ProgramArguments:
+- `/opt/homebrew/bin/node`
+- `/Users/<user>/.openclaw/workspace/skills/mautic/mautic_webhook_bridge.js`
+
+Nhớ set đủ env trong plist:
+- `MAUTIC_WEBHOOK_SECRET`
+- `OPENCLAW_HOOK_TOKEN`
+- `OPENCLAW_HOOK_URL`
+- `MAUTIC_BRIDGE_HOST`
+- `MAUTIC_BRIDGE_PORT`
+- `MAUTIC_BRIDGE_PATH`
+
+> Nếu chỉ chạy bridge bằng terminal tạm thời rồi đóng terminal, bridge sẽ chết.
+
+---
+
+## 8) Troubleshooting
+
+### A) Mautic báo private IP URL not allowed
+- Mautic đang chặn URL private/LAN theo mặc định.
+- Cần bật whitelist/allow private URL trong system settings của Mautic, hoặc dùng URL public/tunnel.
+
+### B) Hook trả `401 Unauthorized`
+- Sai `OPENCLAW_HOOK_TOKEN` hoặc bridge forward sai token.
+
+### C) Hook trả `500 hook mapping failed`
+- Transform module sai path hoặc export sai kiểu.
+
+### D) Mautic action trả `403 You do not have access`
+- Role API user chưa đủ quyền Contacts/Segments/Tags/Points.
+
+### E) Restart gateway không lỗi nhưng webhook không chạy
+- Gateway sống, nhưng mapping/hook chưa đúng hoặc bridge không chạy nền.
+- Kiểm tra lại:
+  - `openclaw gateway status`
+  - `hooks.enabled/token/path/mappings`
+  - bridge process còn sống không
+
+### F) Thấy log `Exec failed ... SIGTERM` khi test bridge
+- Bình thường nếu bạn chủ động kill process test.
+- Không phải bug chức năng, chỉ là process bị dừng.
+
+---
+
+## 9) Security best-practices
+
+- Dùng user Mautic riêng cho agent.
+- Không hardcode secrets vào source code.
+- Secret Mautic webhook và OpenClaw hook token nên là 2 giá trị mạnh, quản lý rõ ràng.
+- Nếu mở ra ngoài LAN: reverse proxy + TLS + IP allowlist.
+
+---
+
+## 10) Lệnh chat mẫu
+
+- "Tìm contact theo email abc@xyz.com trong Mautic"
+- "Tạo contact mới email a@b.com tên A B"
+- "Gắn tag VIP cho contact id 12"
+- "Cộng 10 điểm cho contact id 12"
+- "Đưa contact id 12 vào segment id 5"
