@@ -350,6 +350,16 @@ export NEO4J_PASSWORD=$(grep '^NEO4J_PASSWORD=' "$OPENMEMORY_DIR/api/.env" 2>/de
 set +euo pipefail
 
 docker compose up -d --build
+COMPOSE_EXIT=$?
+
+if [ $COMPOSE_EXIT -ne 0 ]; then
+    perr "Docker Compose failed (exit code: $COMPOSE_EXIT). Check Docker/network and retry."
+fi
+
+# Double-check: verify at least API container exists
+if ! docker compose ps --format '{{.Service}}' 2>/dev/null | grep -q 'openmemory-mcp'; then
+    perr "Containers did not start. Run 'docker compose up -d --build' manually to debug."
+fi
 
 pok "All containers started!"
 
