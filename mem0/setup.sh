@@ -236,6 +236,24 @@ else
     pok "ui/.env already exists"
 fi
 
+# Custom UI port (default 3000)
+if [ ! -f "$INSTALL_DIR/.ui_port" ]; then
+    echo ""
+    echo -e "${YELLOW}OpenMemory UI port (default: 3000, press Enter to skip):${NC}"
+    read -rp "  UI Port [3000]: " UI_PORT_INPUT || true
+    UI_PORT="${UI_PORT_INPUT:-3000}"
+    # Validate port number
+    if ! echo "$UI_PORT" | grep -qE '^[0-9]+$' || [ "$UI_PORT" -lt 1024 ] || [ "$UI_PORT" -gt 65535 ]; then
+        pwn "Invalid port '$UI_PORT', using default 3000"
+        UI_PORT=3000
+    fi
+    echo "$UI_PORT" > "$INSTALL_DIR/.ui_port"
+    pok "UI Port: $UI_PORT"
+else
+    UI_PORT=$(cat "$INSTALL_DIR/.ui_port")
+    pok "UI Port: $UI_PORT (from previous config)"
+fi
+
 pok "Configuration: OK"
 
 # ========================================
@@ -313,7 +331,7 @@ services:
     image: mem0/openmemory-ui:latest
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${UI_PORT:-3000}:3000"
     environment:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8765}
       - NEXT_PUBLIC_USER_ID=${USER}
@@ -482,8 +500,9 @@ curl -sf "http://localhost:7474" > /dev/null 2>&1 \
     && pok "Neo4j Graph DB: OK (port 7474)" \
     || { pwn "Neo4j: starting (may take 30s more)"; ALL_OK=false; }
 
-curl -sf "http://localhost:3000" > /dev/null 2>&1 \
-    && pok "OpenMemory UI: OK (port 3000)" \
+UI_PORT=$(cat "$INSTALL_DIR/.ui_port" 2>/dev/null || echo "3000")
+curl -sf "http://localhost:${UI_PORT}" > /dev/null 2>&1 \
+    && pok "OpenMemory UI: OK (port ${UI_PORT})" \
     || { pwn "UI: still starting..."; ALL_OK=false; }
 
 # Verify packages inside container

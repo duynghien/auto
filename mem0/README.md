@@ -67,7 +67,7 @@ Use the helper script:
 | Service | URL |
 |---|---|
 | API Docs | `http://localhost:8765/docs` |
-| Dashboard UI | `http://localhost:3000` |
+| Dashboard UI | `http://localhost:<UI_PORT>` (default: `3000`) |
 | Qdrant | `http://localhost:6333` |
 | Neo4j Browser | `http://localhost:7474` (user: `neo4j`, pass: `mem0_neo4j_pass`) |
 
@@ -173,7 +173,7 @@ Sử dụng script hỗ trợ sau:
 | Dịch vụ | Địa chỉ URL |
 |---|---|
 | API Docs | `http://localhost:8765/docs` |
-| Dashboard UI | `http://localhost:3000` |
+| Dashboard UI | `http://localhost:<UI_PORT>` (mặc định: `3000`) |
 | Qdrant | `http://localhost:6333` |
 | Neo4j Browser | `http://localhost:7474` (user: `neo4j`, pass: `mem0_neo4j_pass`) |
 

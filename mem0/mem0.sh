@@ -71,8 +71,9 @@ case "${1:-help}" in
         curl -sf http://localhost:6333/healthz > /dev/null 2>&1 && echo -e "${GREEN}OK${NC}" || echo -e "${YELLOW}DOWN${NC}"
         echo -n "  Neo4j:    "
         curl -sf http://localhost:7474 > /dev/null 2>&1 && echo -e "${GREEN}OK${NC}" || echo -e "${YELLOW}DOWN${NC}"
+        UI_PORT=$(cat "$INSTALL_DIR/.ui_port" 2>/dev/null || echo "3000")
         echo -n "  UI:       "
-        curl -sf http://localhost:3000 > /dev/null 2>&1 && echo -e "${GREEN}OK${NC}" || echo -e "${YELLOW}DOWN${NC}"
+        curl -sf "http://localhost:${UI_PORT}" > /dev/null 2>&1 && echo -e "${GREEN}OK${NC}" || echo -e "${YELLOW}DOWN${NC}"
         echo ""
         echo -n "  API_KEY:         "
         if docker exec openmemory-openmemory-mcp-1 printenv API_KEY 2>/dev/null | grep -q '.'; then
