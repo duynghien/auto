@@ -147,7 +147,7 @@ mkdir -p "$INSTALL_DIR"
 # Always update mem0.sh helper; keep .env.example as no-clobber
 if [[ "$SCRIPT_DIR" != "$INSTALL_DIR" ]]; then
     pwn "Copying configs to $INSTALL_DIR ..."
-    [[ -f "$SCRIPT_DIR/.env.example" ]] && cp -n "$SCRIPT_DIR/.env.example" "$INSTALL_DIR/" 2>/dev/null || true
+    [[ -f "$SCRIPT_DIR/.env.example" ]] && cp "$SCRIPT_DIR/.env.example" "$INSTALL_DIR/" 2>/dev/null || true
     [[ -f "$SCRIPT_DIR/mem0.sh" ]] && cp "$SCRIPT_DIR/mem0.sh" "$INSTALL_DIR/" 2>/dev/null || true
 fi
 cd "$INSTALL_DIR"
@@ -173,86 +173,52 @@ echo -e "${BOLD}[3/7] Environment configuration${NC}"
 OPENMEMORY_DIR="$INSTALL_DIR/openmemory-source/openmemory"
 NEO4J_PASSWORD="mem0_neo4j_pass"
 
-# Create api/.env
-if [ ! -f "$OPENMEMORY_DIR/api/.env" ]; then
-    OPENAI_KEY="${OPENAI_API_KEY:-}"
-    if [ -z "$OPENAI_KEY" ]; then
-        echo ""
-        echo -e "${YELLOW}OpenAI API Key is REQUIRED for Mem0 (embedding + extraction).${NC}"
-        read -rp "  OpenAI API Key: " OPENAI_KEY || true
-        if [ -z "${OPENAI_KEY:-}" ]; then
-            perr "OpenAI API Key is required. Cannot proceed without it."
-        fi
-    else
-        pok "Using OPENAI_API_KEY from environment"
-    fi
-
-    cat > "$OPENMEMORY_DIR/api/.env" << EOF
-OPENAI_API_KEY=${OPENAI_KEY}
-API_KEY=${OPENAI_KEY}
-USER=${USER}
-NEO4J_URI=bolt://neo4j:7687
-NEO4J_USERNAME=neo4j
-NEO4J_PASSWORD=${NEO4J_PASSWORD}
-EOF
-    pok "api/.env created"
+# Create root .env
+ENV_FILE="$INSTALL_DIR/.env"
+if [ ! -f "$ENV_FILE" ]; then
+    cp "$INSTALL_DIR/.env.example" "$ENV_FILE"
+    pok "Created fresh .env from template"
 else
-    # Upgrade: add Neo4j vars if missing
-    NEED_UPGRADE=false
-    if ! grep -q '^NEO4J_URI=' "$OPENMEMORY_DIR/api/.env" 2>/dev/null; then
-        echo "NEO4J_URI=bolt://neo4j:7687" >> "$OPENMEMORY_DIR/api/.env"
-        NEED_UPGRADE=true
-    fi
-    if ! grep -q '^NEO4J_USERNAME=' "$OPENMEMORY_DIR/api/.env" 2>/dev/null; then
-        echo "NEO4J_USERNAME=neo4j" >> "$OPENMEMORY_DIR/api/.env"
-        NEED_UPGRADE=true
-    fi
-    if ! grep -q '^NEO4J_PASSWORD=' "$OPENMEMORY_DIR/api/.env" 2>/dev/null; then
-        echo "NEO4J_PASSWORD=${NEO4J_PASSWORD}" >> "$OPENMEMORY_DIR/api/.env"
-        NEED_UPGRADE=true
-    fi
-    if ! grep -q '^API_KEY=' "$OPENMEMORY_DIR/api/.env" 2>/dev/null; then
-        EXISTING_KEY=$(grep '^OPENAI_API_KEY=' "$OPENMEMORY_DIR/api/.env" | cut -d= -f2-)
-        if [ -n "${EXISTING_KEY:-}" ]; then
-            echo "API_KEY=${EXISTING_KEY}" >> "$OPENMEMORY_DIR/api/.env"
-            NEED_UPGRADE=true
-        fi
-    fi
-    if [ "$NEED_UPGRADE" = true ]; then
-        pok "api/.env upgraded (added Neo4j + API_KEY)"
-    else
-        pok "api/.env already exists"
-    fi
+    pok "Using existing .env file"
 fi
 
-# Create ui/.env
-if [ ! -f "$OPENMEMORY_DIR/ui/.env" ]; then
-    cat > "$OPENMEMORY_DIR/ui/.env" << EOF
-NEXT_PUBLIC_API_URL=http://localhost:8765
-NEXT_PUBLIC_USER_ID=${USER}
-EOF
-    pok "ui/.env created"
-else
-    pok "ui/.env already exists"
-fi
+# Load existing values
+source "$ENV_FILE" 2>/dev/null || true
 
-# Custom UI port (default 3000)
-if [ ! -f "$INSTALL_DIR/.ui_port" ]; then
+# Check OPENAI_API_KEY
+if [ -z "${OPENAI_API_KEY:-}" ] || echo "$OPENAI_API_KEY" | grep -q 'sk-xxx'; then
     echo ""
-    echo -e "${YELLOW}OpenMemory UI port (default: 3000, press Enter to skip):${NC}"
-    read -rp "  UI Port [3000]: " UI_PORT_INPUT || true
-    UI_PORT="${UI_PORT_INPUT:-3000}"
-    # Validate port number
-    if ! echo "$UI_PORT" | grep -qE '^[0-9]+$' || [ "$UI_PORT" -lt 1024 ] || [ "$UI_PORT" -gt 65535 ]; then
-        pwn "Invalid port '$UI_PORT', using default 3000"
-        UI_PORT=3000
+    echo -e "${YELLOW}OpenAI API Key is REQUIRED for Mem0 (embedding + extraction).${NC}"
+    read -rp "  OpenAI API Key: " NEW_OPENAI_KEY || true
+    if [ -z "${NEW_OPENAI_KEY:-}" ]; then
+        perr "OpenAI API Key is required. Cannot proceed without it."
     fi
-    echo "$UI_PORT" > "$INSTALL_DIR/.ui_port"
-    pok "UI Port: $UI_PORT"
-else
-    UI_PORT=$(cat "$INSTALL_DIR/.ui_port")
-    pok "UI Port: $UI_PORT (from previous config)"
+    if ! grep -q "^OPENAI_API_KEY=" "$ENV_FILE"; then echo "OPENAI_API_KEY=$NEW_OPENAI_KEY" >> "$ENV_FILE"; else awk -v key="OPENAI_API_KEY" -v val="$NEW_OPENAI_KEY" -F'=' 'BEGIN{OFS="="} $1==key {$2=val} {print}' "$ENV_FILE" > "$ENV_FILE.tmp" && mv "$ENV_FILE.tmp" "$ENV_FILE"; fi
+    if ! grep -q "^API_KEY=" "$ENV_FILE"; then echo "API_KEY=$NEW_OPENAI_KEY" >> "$ENV_FILE"; else awk -v key="API_KEY" -v val="$NEW_OPENAI_KEY" -F'=' 'BEGIN{OFS="="} $1==key {$2=val} {print}' "$ENV_FILE" > "$ENV_FILE.tmp" && mv "$ENV_FILE.tmp" "$ENV_FILE"; fi
+    export OPENAI_API_KEY="$NEW_OPENAI_KEY"
+    export API_KEY="$NEW_OPENAI_KEY"
+    pok "Saved OpenAI API Key"
 fi
+
+# Check UI_PORT
+if [ "${UI_PORT:-3000}" = "3000" ]; then
+    echo ""
+    echo -e "${YELLOW}OpenMemory UI port (default: 3000, press Enter to keep):${NC}"
+    read -rp "  UI Port [3000]: " UI_PORT_INPUT || true
+    NEW_UI_PORT="${UI_PORT_INPUT:-3000}"
+    if ! echo "$NEW_UI_PORT" | grep -qE '^[0-9]+$' || [ "$NEW_UI_PORT" -lt 1024 ] || [ "$NEW_UI_PORT" -gt 65535 ]; then
+        pwn "Invalid port '$NEW_UI_PORT', keeping 3000"
+        NEW_UI_PORT=3000
+    fi
+    if [ "$NEW_UI_PORT" != "3000" ] || ! grep -q "^UI_PORT=" "$ENV_FILE"; then
+        if ! grep -q "^UI_PORT=" "$ENV_FILE"; then echo "UI_PORT=$NEW_UI_PORT" >> "$ENV_FILE"; else awk -v key="UI_PORT" -v val="$NEW_UI_PORT" -F'=' 'BEGIN{OFS="="} $1==key {$2=val} {print}' "$ENV_FILE" > "$ENV_FILE.tmp" && mv "$ENV_FILE.tmp" "$ENV_FILE"; fi
+        pok "UI Port set to $NEW_UI_PORT"
+        export UI_PORT="$NEW_UI_PORT"
+    fi
+fi
+
+# Cleanup legacy config files
+rm -f "$INSTALL_DIR/.ui_port" "$OPENMEMORY_DIR/api/.env" "$OPENMEMORY_DIR/ui/.env" 2>/dev/null || true
 
 pok "Configuration: OK"
 
@@ -297,15 +263,8 @@ services:
     image: mem0/openmemory-mcp
     build: api/
     restart: unless-stopped
-    environment:
-      - USER
-      - API_KEY
-      - OPENAI_API_KEY
-      - NEO4J_URI=bolt://neo4j:7687
-      - NEO4J_USERNAME=neo4j
-      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-mem0_neo4j_pass}
     env_file:
-      - api/.env
+      - ../../.env
     depends_on:
       mem0_store:
         condition: service_started
@@ -330,11 +289,10 @@ services:
       dockerfile: Dockerfile
     image: mem0/openmemory-ui:latest
     restart: unless-stopped
+    env_file:
+      - ../../.env
     ports:
       - "${UI_PORT:-3000}:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8765}
-      - NEXT_PUBLIC_USER_ID=${USER}
     depends_on:
       openmemory-mcp:
         condition: service_healthy
@@ -356,13 +314,10 @@ echo ""
 
 cd "$OPENMEMORY_DIR"
 
-# Export env vars needed by docker-compose.yml
-export NEXT_PUBLIC_USER_ID="${USER}"
-export NEXT_PUBLIC_API_URL="http://localhost:8765"
-export API_KEY=$(grep '^API_KEY=' "$OPENMEMORY_DIR/api/.env" 2>/dev/null | cut -d= -f2- || echo "")
-export OPENAI_API_KEY=$(grep '^OPENAI_API_KEY=' "$OPENMEMORY_DIR/api/.env" 2>/dev/null | cut -d= -f2- || echo "")
-export NEO4J_PASSWORD=$(grep '^NEO4J_PASSWORD=' "$OPENMEMORY_DIR/api/.env" 2>/dev/null | cut -d= -f2- || echo "mem0_neo4j_pass")
-export UI_PORT="${UI_PORT:-3000}"
+# Export all env vars for docker-compose.yml and systemd
+set -a
+[ -f "$ENV_FILE" ] && source "$ENV_FILE"
+set +a
 
 # Disable strict error mode for docker compose and post-deploy
 # (build output on stderr + pip warnings are non-fatal)
@@ -501,9 +456,8 @@ curl -sf "http://localhost:7474" > /dev/null 2>&1 \
     && pok "Neo4j Graph DB: OK (port 7474)" \
     || { pwn "Neo4j: starting (may take 30s more)"; ALL_OK=false; }
 
-UI_PORT=$(cat "$INSTALL_DIR/.ui_port" 2>/dev/null || echo "3000")
-curl -sf "http://localhost:${UI_PORT}" > /dev/null 2>&1 \
-    && pok "OpenMemory UI: OK (port ${UI_PORT})" \
+curl -sf "http://localhost:${UI_PORT:-3000}" > /dev/null 2>&1 \
+    && pok "OpenMemory UI: OK (port ${UI_PORT:-3000})" \
     || { pwn "UI: still starting..."; ALL_OK=false; }
 
 # Verify packages inside container
@@ -524,7 +478,6 @@ fi
 # Systemd for Linux
 if [[ "$PLATFORM" != "mac" ]]; then
     COMPOSE_PATH="$OPENMEMORY_DIR/docker-compose.yml"
-    NEO4J_PW_ESCAPED=$(grep '^NEO4J_PASSWORD=' "$OPENMEMORY_DIR/api/.env" 2>/dev/null | cut -d= -f2- || echo "mem0_neo4j_pass")
     sudo bash -c "cat > /etc/systemd/system/mem0.service << EOF
 [Unit]
 Description=Mem0 OpenMemory (Qdrant + Neo4j)
@@ -535,9 +488,7 @@ Requires=docker.service
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=$OPENMEMORY_DIR
-Environment=NEXT_PUBLIC_USER_ID=$USER
-Environment=NEXT_PUBLIC_API_URL=http://localhost:8765
-Environment=NEO4J_PASSWORD=$NEO4J_PW_ESCAPED
+Environment=NEO4J_PASSWORD=$NEO4J_PASSWORD
 Environment=UI_PORT=$UI_PORT
 ExecStart=/usr/bin/docker compose -f $COMPOSE_PATH up -d
 ExecStop=/usr/bin/docker compose -f $COMPOSE_PATH down

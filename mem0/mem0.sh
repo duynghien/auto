@@ -4,7 +4,11 @@
 
 INSTALL_DIR="$HOME/self-hosted/mem0"
 COMPOSE_DIR="$INSTALL_DIR/openmemory-source/openmemory"
-export UI_PORT=$(cat "$INSTALL_DIR/.ui_port" 2>/dev/null || echo "3000")
+
+# Export environment variables for docker compose interpolation
+set -a
+[ -f "$INSTALL_DIR/.env" ] && source "$INSTALL_DIR/.env"
+set +a
 
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
@@ -73,7 +77,7 @@ case "${1:-help}" in
         echo -n "  Neo4j:    "
         curl -sf http://localhost:7474 > /dev/null 2>&1 && echo -e "${GREEN}OK${NC}" || echo -e "${YELLOW}DOWN${NC}"
         echo -n "  UI:       "
-        curl -sf "http://localhost:${UI_PORT}" > /dev/null 2>&1 && echo -e "${GREEN}OK${NC}" || echo -e "${YELLOW}DOWN${NC}"
+        curl -sf "http://localhost:${UI_PORT:-3000}" > /dev/null 2>&1 && echo -e "${GREEN}OK${NC}" || echo -e "${YELLOW}DOWN${NC}"
         echo ""
         echo -n "  API_KEY:         "
         if docker exec openmemory-openmemory-mcp-1 printenv API_KEY 2>/dev/null | grep -q '.'; then
