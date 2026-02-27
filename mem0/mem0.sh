@@ -4,6 +4,7 @@
 
 INSTALL_DIR="$HOME/self-hosted/mem0"
 COMPOSE_DIR="$INSTALL_DIR/openmemory-source/openmemory"
+export UI_PORT=$(cat "$INSTALL_DIR/.ui_port" 2>/dev/null || echo "3000")
 
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
@@ -71,7 +72,6 @@ case "${1:-help}" in
         curl -sf http://localhost:6333/healthz > /dev/null 2>&1 && echo -e "${GREEN}OK${NC}" || echo -e "${YELLOW}DOWN${NC}"
         echo -n "  Neo4j:    "
         curl -sf http://localhost:7474 > /dev/null 2>&1 && echo -e "${GREEN}OK${NC}" || echo -e "${YELLOW}DOWN${NC}"
-        UI_PORT=$(cat "$INSTALL_DIR/.ui_port" 2>/dev/null || echo "3000")
         echo -n "  UI:       "
         curl -sf "http://localhost:${UI_PORT}" > /dev/null 2>&1 && echo -e "${GREEN}OK${NC}" || echo -e "${YELLOW}DOWN${NC}"
         echo ""

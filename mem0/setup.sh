@@ -362,6 +362,7 @@ export NEXT_PUBLIC_API_URL="http://localhost:8765"
 export API_KEY=$(grep '^API_KEY=' "$OPENMEMORY_DIR/api/.env" 2>/dev/null | cut -d= -f2- || echo "")
 export OPENAI_API_KEY=$(grep '^OPENAI_API_KEY=' "$OPENMEMORY_DIR/api/.env" 2>/dev/null | cut -d= -f2- || echo "")
 export NEO4J_PASSWORD=$(grep '^NEO4J_PASSWORD=' "$OPENMEMORY_DIR/api/.env" 2>/dev/null | cut -d= -f2- || echo "mem0_neo4j_pass")
+export UI_PORT="${UI_PORT:-3000}"
 
 # Disable strict error mode for docker compose and post-deploy
 # (build output on stderr + pip warnings are non-fatal)
@@ -537,6 +538,7 @@ WorkingDirectory=$OPENMEMORY_DIR
 Environment=NEXT_PUBLIC_USER_ID=$USER
 Environment=NEXT_PUBLIC_API_URL=http://localhost:8765
 Environment=NEO4J_PASSWORD=$NEO4J_PW_ESCAPED
+Environment=UI_PORT=$UI_PORT
 ExecStart=/usr/bin/docker compose -f $COMPOSE_PATH up -d
 ExecStop=/usr/bin/docker compose -f $COMPOSE_PATH down
 TimeoutStartSec=180
