@@ -565,11 +565,11 @@ echo ""
 echo -e "  Platform:       ${CYAN}${PLATFORM_LABEL}${NC}"
 echo -e "  Mem0 API:       ${PURPLE}http://localhost:8765${NC}"
 echo -e "  API Docs:       ${PURPLE}http://localhost:8765/docs${NC}"
-echo -e "  OpenMemory UI:  ${PURPLE}http://localhost:3000${NC}"
+echo -e "  OpenMemory UI:  ${PURPLE}http://localhost:${UI_PORT}${NC}"
 echo -e "  Qdrant:         ${PURPLE}http://localhost:6333${NC}"
 echo -e "  Neo4j Browser:  ${PURPLE}http://localhost:7474${NC}"
 if [[ "$PLATFORM" != "mac" ]]; then
-    echo -e "  LAN URL:        ${PURPLE}http://${LAN_IP}:3000${NC}"
+    echo -e "  LAN URL:        ${PURPLE}http://${LAN_IP}:${UI_PORT}${NC}"
 fi
 echo ""
 echo -e "${CYAN}Stack:${NC}"
