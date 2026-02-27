@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# setup.sh - Mem0 OpenMemory Docker Setup
+# setup.sh - Mem0 OpenMemory Docker Setup (Optimal Stack)
+# Stack: Qdrant + Neo4j Graph Memory + FastAPI + Next.js UI
 # Supports: macOS (Apple Silicon), Raspberry Pi, VPS (amd64/arm64)
 # Created by vnROM.net
 
@@ -60,14 +61,15 @@ echo " ( (_| | |_| | |_| | | | ( (_| | | | | | ____| | | |"
 echo "  \____|____/ \__  |_| |_|\___ |_| |_|_|_____)_| |_|"
 echo "             (____/      (_____|                    "
 echo ""
-echo "          Mem0 OpenMemory Setup — $PLATFORM_LABEL"
+echo "       Mem0 OpenMemory Setup — $PLATFORM_LABEL"
+echo "       Stack: Qdrant + Neo4j + FastAPI + Next.js"
 echo "================================================================${NC}"
 echo ""
 
 # ========================================
 # Step 1: System Check & Dependencies
 # ========================================
-echo -e "${BOLD}[1/5] System Check${NC}"
+echo -e "${BOLD}[1/7] System Check${NC}"
 
 if [[ "$PLATFORM" == "mac" ]]; then
     if ! command -v docker &> /dev/null; then
@@ -136,18 +138,17 @@ pok "Platform: $PLATFORM_LABEL"
 # Step 2: Install Directory & Source
 # ========================================
 echo ""
-echo -e "${BOLD}[2/5] Setting up directory${NC}"
+echo -e "${BOLD}[2/7] Setting up directory${NC}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 INSTALL_DIR="$HOME/self-hosted/mem0"
 mkdir -p "$INSTALL_DIR"
 
-# Copy helper files from repo
+# Always update mem0.sh helper; keep .env.example as no-clobber
 if [[ "$SCRIPT_DIR" != "$INSTALL_DIR" ]]; then
     pwn "Copying configs to $INSTALL_DIR ..."
-    for f in .env.example mem0.sh; do
-        [[ -f "$SCRIPT_DIR/$f" ]] && cp -n "$SCRIPT_DIR/$f" "$INSTALL_DIR/" 2>/dev/null || true
-    done
+    [[ -f "$SCRIPT_DIR/.env.example" ]] && cp -n "$SCRIPT_DIR/.env.example" "$INSTALL_DIR/" 2>/dev/null || true
+    [[ -f "$SCRIPT_DIR/mem0.sh" ]] && cp "$SCRIPT_DIR/mem0.sh" "$INSTALL_DIR/" 2>/dev/null || true
 fi
 cd "$INSTALL_DIR"
 
@@ -167,11 +168,12 @@ pok "Directories: OK"
 # Step 3: Environment Configuration
 # ========================================
 echo ""
-echo -e "${BOLD}[3/5] Environment configuration${NC}"
+echo -e "${BOLD}[3/7] Environment configuration${NC}"
+
+OPENMEMORY_DIR="$INSTALL_DIR/openmemory-source/openmemory"
+NEO4J_PASSWORD="mem0_neo4j_pass"
 
 # Create api/.env
-OPENMEMORY_DIR="$INSTALL_DIR/openmemory-source/openmemory"
-
 if [ ! -f "$OPENMEMORY_DIR/api/.env" ]; then
     OPENAI_KEY="${OPENAI_API_KEY:-}"
     if [ -z "$OPENAI_KEY" ]; then
@@ -187,11 +189,40 @@ if [ ! -f "$OPENMEMORY_DIR/api/.env" ]; then
 
     cat > "$OPENMEMORY_DIR/api/.env" << EOF
 OPENAI_API_KEY=${OPENAI_KEY}
+API_KEY=${OPENAI_KEY}
 USER=${USER}
+NEO4J_URI=bolt://neo4j:7687
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=${NEO4J_PASSWORD}
 EOF
     pok "api/.env created"
 else
-    pok "api/.env already exists"
+    # Upgrade: add Neo4j vars if missing
+    NEED_UPGRADE=false
+    if ! grep -q '^NEO4J_URI=' "$OPENMEMORY_DIR/api/.env" 2>/dev/null; then
+        echo "NEO4J_URI=bolt://neo4j:7687" >> "$OPENMEMORY_DIR/api/.env"
+        NEED_UPGRADE=true
+    fi
+    if ! grep -q '^NEO4J_USERNAME=' "$OPENMEMORY_DIR/api/.env" 2>/dev/null; then
+        echo "NEO4J_USERNAME=neo4j" >> "$OPENMEMORY_DIR/api/.env"
+        NEED_UPGRADE=true
+    fi
+    if ! grep -q '^NEO4J_PASSWORD=' "$OPENMEMORY_DIR/api/.env" 2>/dev/null; then
+        echo "NEO4J_PASSWORD=${NEO4J_PASSWORD}" >> "$OPENMEMORY_DIR/api/.env"
+        NEED_UPGRADE=true
+    fi
+    if ! grep -q '^API_KEY=' "$OPENMEMORY_DIR/api/.env" 2>/dev/null; then
+        EXISTING_KEY=$(grep '^OPENAI_API_KEY=' "$OPENMEMORY_DIR/api/.env" | cut -d= -f2-)
+        if [ -n "${EXISTING_KEY:-}" ]; then
+            echo "API_KEY=${EXISTING_KEY}" >> "$OPENMEMORY_DIR/api/.env"
+            NEED_UPGRADE=true
+        fi
+    fi
+    if [ "$NEED_UPGRADE" = true ]; then
+        pok "api/.env upgraded (added Neo4j + API_KEY)"
+    else
+        pok "api/.env already exists"
+    fi
 fi
 
 # Create ui/.env
@@ -208,30 +239,216 @@ fi
 pok "Configuration: OK"
 
 # ========================================
-# Step 4: Build & Deploy
+# Step 4: Generate Optimized docker-compose.yml
 # ========================================
 echo ""
-echo -e "${BOLD}[4/5] Building and starting containers${NC}"
+echo -e "${BOLD}[4/7] Generating optimized Docker Compose${NC}"
+
+cat > "$OPENMEMORY_DIR/docker-compose.yml" << 'COMPOSEOF'
+services:
+  mem0_store:
+    image: qdrant/qdrant:latest
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+    volumes:
+      - mem0_qdrant_data:/qdrant/storage
+
+  neo4j:
+    image: neo4j:5
+    restart: unless-stopped
+    environment:
+      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:-mem0_neo4j_pass}
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_server_memory_heap_initial__size=256m
+      - NEO4J_server_memory_heap_max__size=512m
+      - NEO4J_server_memory_pagecache_size=128m
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - mem0_neo4j_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p ${NEO4J_PASSWORD:-mem0_neo4j_pass} 'RETURN 1' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  openmemory-mcp:
+    image: mem0/openmemory-mcp
+    build: api/
+    restart: unless-stopped
+    environment:
+      - USER
+      - API_KEY
+      - OPENAI_API_KEY
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USERNAME=neo4j
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-mem0_neo4j_pass}
+    env_file:
+      - api/.env
+    depends_on:
+      mem0_store:
+        condition: service_started
+      neo4j:
+        condition: service_healthy
+    ports:
+      - "8765:8765"
+    volumes:
+      - ./api:/usr/src/openmemory
+    command: >
+      sh -c "uvicorn main:app --host 0.0.0.0 --port 8765 --reload --workers 4"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8765/docs')\" || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 30s
+
+  openmemory-ui:
+    build:
+      context: ui/
+      dockerfile: Dockerfile
+    image: mem0/openmemory-ui:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8765}
+      - NEXT_PUBLIC_USER_ID=${USER}
+    depends_on:
+      openmemory-mcp:
+        condition: service_healthy
+
+volumes:
+  mem0_qdrant_data:
+  mem0_neo4j_data:
+COMPOSEOF
+
+pok "docker-compose.yml generated (Qdrant + Neo4j + API + UI)"
+
+# ========================================
+# Step 5: Build & Deploy
+# ========================================
+echo ""
+echo -e "${BOLD}[5/7] Building and starting containers${NC}"
 pwn "Building OpenMemory from source (first build takes 3-8 min)..."
 echo ""
 
 cd "$OPENMEMORY_DIR"
-NEXT_PUBLIC_USER_ID="${USER}" NEXT_PUBLIC_API_URL="http://localhost:8765" \
-    docker compose up -d --build 2>&1
+
+# Export env vars needed by docker-compose.yml
+export NEXT_PUBLIC_USER_ID="${USER}"
+export NEXT_PUBLIC_API_URL="http://localhost:8765"
+export API_KEY=$(grep '^API_KEY=' "$OPENMEMORY_DIR/api/.env" 2>/dev/null | cut -d= -f2- || echo "")
+export OPENAI_API_KEY=$(grep '^OPENAI_API_KEY=' "$OPENMEMORY_DIR/api/.env" 2>/dev/null | cut -d= -f2- || echo "")
+export NEO4J_PASSWORD=$(grep '^NEO4J_PASSWORD=' "$OPENMEMORY_DIR/api/.env" 2>/dev/null | cut -d= -f2- || echo "mem0_neo4j_pass")
+
+# Disable strict error mode for docker compose and post-deploy
+# (build output on stderr + pip warnings are non-fatal)
+set +euo pipefail
+
+docker compose up -d --build
 
 pok "All containers started!"
 
 # ========================================
-# Step 5: Verify & Summary
+# Step 6: Post-deploy setup
 # ========================================
 echo ""
-echo -e "${BOLD}[5/5] Verification${NC}"
+echo -e "${BOLD}[6/7] Post-deploy configuration${NC}"
 
-echo -n "  Waiting for Mem0 API"
-MAX_WAIT=90
+# Wait for API container to be ready
+echo -n "  Waiting for API container"
+for i in {1..45}; do
+    if docker exec openmemory-openmemory-mcp-1 python -c "import sys; print('ready')" >/dev/null 2>&1; then
+        echo ""
+        break
+    fi
+    echo -n "."
+    sleep 2
+done
+echo ""
+
+# Install qdrant-client inside the API container (required for vector storage)
+pwn "Installing qdrant-client + neo4j driver in API container..."
+docker exec openmemory-openmemory-mcp-1 pip install "qdrant-client>=1.9.1" "neo4j>=5.0.0" --quiet 2>&1 || {
+    pwn "Package install warning (may already be present)"
+}
+pok "qdrant-client + neo4j: installed"
+
+# Restart API to pick up the new packages
+docker compose restart openmemory-mcp 2>&1
+pok "API restarted with new packages"
+
+# Wait for API to come back
+echo -n "  Waiting for API"
+for i in {1..30}; do
+    if curl -sf "http://localhost:8765/docs" > /dev/null 2>&1; then
+        echo ""
+        break
+    fi
+    echo -n "."
+    sleep 3
+done
+echo ""
+
+# Seed Graph Store configuration directly into DB
+# (API's ConfigSchema doesn't include graph_store, so we bypass it)
+echo "  Configuring Neo4j Graph Store..."
+NEO4J_PW=$(grep '^NEO4J_PASSWORD=' "$OPENMEMORY_DIR/api/.env" 2>/dev/null | cut -d= -f2- || echo "mem0_neo4j_pass")
+
+SEED_RESULT=$(docker exec openmemory-openmemory-mcp-1 python -c "
+from app.database import SessionLocal
+from app.models import Config as ConfigModel
+import json, os
+
+db = SessionLocal()
+config = db.query(ConfigModel).filter(ConfigModel.key == 'main').first()
+if config:
+    cfg = config.value
+    if 'mem0' not in cfg:
+        cfg['mem0'] = {}
+    cfg['mem0']['vector_store'] = {
+        'provider': 'qdrant',
+        'config': {'collection_name': 'openmemory', 'host': 'mem0_store', 'port': 6333}
+    }
+    cfg['mem0']['graph_store'] = {
+        'provider': 'neo4j',
+        'config': {
+            'url': os.environ.get('NEO4J_URI', 'bolt://neo4j:7687'),
+            'username': os.environ.get('NEO4J_USERNAME', 'neo4j'),
+            'password': os.environ.get('NEO4J_PASSWORD', '${NEO4J_PW}')
+        }
+    }
+    config.value = cfg
+    db.commit()
+    print('OK')
+else:
+    print('NO_CONFIG')
+db.close()
+" 2>&1)
+
+if echo "$SEED_RESULT" | grep -q 'OK'; then
+    pok "Graph Store (Neo4j): configured in DB"
+else
+    pwn "Graph Store config seeding issue"
+    echo "  Result: ${SEED_RESULT:-empty}" | head -3
+fi
+
+# ========================================
+# Step 7: Verify & Summary
+# ========================================
+echo ""
+echo -e "${BOLD}[7/7] Verification${NC}"
+
+echo -n "  Waiting for all services"
+MAX_WAIT=60
 WAITED=0
 while [ $WAITED -lt $MAX_WAIT ]; do
-    if curl -sf "http://localhost:8765/docs" > /dev/null 2>&1; then
+    if curl -sf "http://localhost:8765/docs" > /dev/null 2>&1 && \
+       curl -sf "http://localhost:6333/healthz" > /dev/null 2>&1; then
         echo ""
         break
     fi
@@ -251,16 +468,36 @@ curl -sf "http://localhost:6333/healthz" > /dev/null 2>&1 \
     && pok "Qdrant Vector DB: OK (port 6333)" \
     || { pwn "Qdrant: starting..."; ALL_OK=false; }
 
+curl -sf "http://localhost:7474" > /dev/null 2>&1 \
+    && pok "Neo4j Graph DB: OK (port 7474)" \
+    || { pwn "Neo4j: starting (may take 30s more)"; ALL_OK=false; }
+
 curl -sf "http://localhost:3000" > /dev/null 2>&1 \
     && pok "OpenMemory UI: OK (port 3000)" \
-    || { pwn "UI: still starting (may take 30s more)"; ALL_OK=false; }
+    || { pwn "UI: still starting..."; ALL_OK=false; }
+
+# Verify packages inside container
+if docker exec openmemory-openmemory-mcp-1 python -c "import qdrant_client" 2>/dev/null; then
+    pok "qdrant-client: available"
+else
+    pwn "qdrant-client: not found"
+    ALL_OK=false
+fi
+
+if docker exec openmemory-openmemory-mcp-1 python -c "import neo4j" 2>/dev/null; then
+    pok "neo4j driver: available"
+else
+    pwn "neo4j driver: not found"
+    ALL_OK=false
+fi
 
 # Systemd for Linux
 if [[ "$PLATFORM" != "mac" ]]; then
     COMPOSE_PATH="$OPENMEMORY_DIR/docker-compose.yml"
+    NEO4J_PW_ESCAPED=$(grep '^NEO4J_PASSWORD=' "$OPENMEMORY_DIR/api/.env" 2>/dev/null | cut -d= -f2- || echo "mem0_neo4j_pass")
     sudo bash -c "cat > /etc/systemd/system/mem0.service << EOF
 [Unit]
-Description=Mem0 OpenMemory
+Description=Mem0 OpenMemory (Qdrant + Neo4j)
 After=docker.service
 Requires=docker.service
 
@@ -270,9 +507,10 @@ RemainAfterExit=yes
 WorkingDirectory=$OPENMEMORY_DIR
 Environment=NEXT_PUBLIC_USER_ID=$USER
 Environment=NEXT_PUBLIC_API_URL=http://localhost:8765
+Environment=NEO4J_PASSWORD=$NEO4J_PW_ESCAPED
 ExecStart=/usr/bin/docker compose -f $COMPOSE_PATH up -d
 ExecStop=/usr/bin/docker compose -f $COMPOSE_PATH down
-TimeoutStartSec=120
+TimeoutStartSec=180
 
 [Install]
 WantedBy=multi-user.target
@@ -300,9 +538,16 @@ echo -e "  Mem0 API:       ${PURPLE}http://localhost:8765${NC}"
 echo -e "  API Docs:       ${PURPLE}http://localhost:8765/docs${NC}"
 echo -e "  OpenMemory UI:  ${PURPLE}http://localhost:3000${NC}"
 echo -e "  Qdrant:         ${PURPLE}http://localhost:6333${NC}"
+echo -e "  Neo4j Browser:  ${PURPLE}http://localhost:7474${NC}"
 if [[ "$PLATFORM" != "mac" ]]; then
     echo -e "  LAN URL:        ${PURPLE}http://${LAN_IP}:3000${NC}"
 fi
+echo ""
+echo -e "${CYAN}Stack:${NC}"
+echo "  • Qdrant — Vector semantic search"
+echo "  • Neo4j — Entity relationship graph"
+echo "  • FastAPI — Memory API + MCP server"
+echo "  • Next.js — Dashboard UI"
 echo ""
 echo -e "${CYAN}MCP Integration (Claude Desktop):${NC}"
 echo "  npx @openmemory/install local http://localhost:8765/mcp/claude/sse/${USER} --client claude"
@@ -311,14 +556,15 @@ echo -e "${CYAN}MCP Integration (Cursor):${NC}"
 echo "  npx @openmemory/install local http://localhost:8765/mcp/cursor/sse/${USER} --client cursor"
 echo ""
 echo -e "${CYAN}Quick test:${NC}"
-echo "  curl -X POST http://localhost:8765/v1/memories/ \\"
+echo "  curl -X POST http://localhost:8765/api/v1/memories/ \\"
 echo "    -H 'Content-Type: application/json' \\"
-echo "    -d '{\"messages\": [{\"role\": \"user\", \"content\": \"My name is Duy\"}]}'"
+echo "    -d '{\"user_id\": \"${USER}\", \"text\": \"My name is Duy\"}'"
 echo ""
 echo -e "${CYAN}Management:${NC}"
-echo "  • Start:  cd $OPENMEMORY_DIR && docker compose up -d"
-echo "  • Stop:   cd $OPENMEMORY_DIR && docker compose down"
-echo "  • Logs:   cd $OPENMEMORY_DIR && docker compose logs -f"
-echo "  • Update: cd $INSTALL_DIR && git -C openmemory-source pull && cd $OPENMEMORY_DIR && docker compose up -d --build"
+echo "  • Start:  ~/self-hosted/mem0/mem0.sh start"
+echo "  • Stop:   ~/self-hosted/mem0/mem0.sh stop"
+echo "  • Status: ~/self-hosted/mem0/mem0.sh status"
+echo "  • Logs:   ~/self-hosted/mem0/mem0.sh logs"
+echo "  • Purge:  ~/self-hosted/mem0/mem0.sh purge  (⚠️ removes all data)"
 echo ""
 echo "Support: https://ai.vnrom.net"
