@@ -12,17 +12,11 @@ WEB_ROOT="${WEB_ROOT:-/var/www}"
 RESTORE_TIMEOUT_SECONDS="${RESTORE_TIMEOUT_SECONDS:-600}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILES=(
-  "${SCRIPT_DIR}/backup.env"
-  "/etc/backup/backup.env"
-  "/opt/scripts/backup.env"
-)
-for env_file in "${ENV_FILES[@]}"; do
-  if [ -f "$env_file" ]; then
-    # shellcheck disable=SC1090
-    . "$env_file"
-  fi
-done
+ENV_FILE="${SCRIPT_DIR}/backup.env"
+if [ -f "$ENV_FILE" ]; then
+  # shellcheck disable=SC1090
+  . "$ENV_FILE"
+fi
 
 usage() {
   cat <<USAGE

@@ -109,8 +109,7 @@ check_dependencies
 
 echo "[Bước 1/5] Chọn đường dẫn cài đặt"
 INSTALL_DIR="$(ask_value "- Thư mục cài script" "/opt/scripts")"
-ENV_DIR="$(ask_value "- Thư mục chứa cấu hình backup.env" "/etc/backup")"
-ENV_FILE="$ENV_DIR/backup.env"
+ENV_FILE="$INSTALL_DIR/backup.env"
 
 echo ""
 echo "[Bước 2/5] Cấu hình backup local"
@@ -164,7 +163,7 @@ if [ "$CRON_ENABLED" = "true" ]; then
   CRON_SCHEDULE="$(ask_value "- Lịch cron" "0 2 * * *")"
 fi
 
-mkdir -p "$INSTALL_DIR" "$ENV_DIR" "$BACKUP_DIR"
+mkdir -p "$INSTALL_DIR" "$BACKUP_DIR"
 
 cp -f "$SRC_BACKUP" "$INSTALL_DIR/backup.sh"
 cp -f "$SRC_RESTORE" "$INSTALL_DIR/restore.sh"
@@ -195,7 +194,6 @@ TG_CHAT_ID=$TG_CHAT_ID
 ENVEOF
 
 chmod 600 "$ENV_FILE"
-ln -sfn "$ENV_FILE" "$INSTALL_DIR/backup.env"
 
 if [ "$CRON_ENABLED" = "true" ]; then
   CRON_FILE="/etc/cron.d/wordops-backup"

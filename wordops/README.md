@@ -48,14 +48,15 @@ sudo bash setup.sh
 Setup sẽ:
 1. Hỏi thông tin cấu hình và lưu vào `backup.env`.
 2. Cài script vào `/opt/scripts` (hoặc đường dẫn bạn nhập).
-3. Tạo symlink `backup.env` cạnh script.
+3. Lưu `backup.env` duy nhất ngay cạnh `backup.sh`/`restore.sh`.
 4. Tạo cron tự động (nếu bạn bật).
 
 ## Cấu hình
 
 File chính sau setup:
 
-- `/etc/backup/backup.env` (quyền `600`)
+- `/opt/scripts/backup.env` (mặc định, quyền `600`)
+- Nếu bạn đổi thư mục cài script khi setup: `<INSTALL_DIR>/backup.env`
 
 Bạn có thể tham khảo mẫu biến tại:
 
@@ -105,5 +106,5 @@ Khuyến nghị: test restore ít nhất 1 site/tháng trên môi trường stag
 
 - Không hardcode secret trong script.
 - Chỉ lưu token/password trong `backup.env`.
-- Đặt quyền file cấu hình: `chmod 600 /etc/backup/backup.env`.
+- Đặt quyền file cấu hình: `chmod 600 /opt/scripts/backup.env`.
 - Nếu lộ token/password, phải rotate ngay.

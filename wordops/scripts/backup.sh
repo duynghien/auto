@@ -12,18 +12,12 @@ set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# ==== FILE CẤU HÌNH ƯU TIÊN NẠP (ghi đè biến mặc định) ====
-ENV_FILES=(
-  "${SCRIPT_DIR}/backup.env"
-  "/etc/backup/backup.env"
-  "/opt/scripts/backup.env"
-)
-for env_file in "${ENV_FILES[@]}"; do
-  if [ -f "$env_file" ]; then
-    # shellcheck disable=SC1090
-    . "$env_file"
-  fi
-done
+# ==== FILE CẤU HÌNH (cùng thư mục script) ====
+ENV_FILE="${SCRIPT_DIR}/backup.env"
+if [ -f "$ENV_FILE" ]; then
+  # shellcheck disable=SC1090
+  . "$ENV_FILE"
+fi
 
 # ==== CONFIG (WordOps defaults) ====
 WEB_ROOT="${WEB_ROOT:-/var/www}"
