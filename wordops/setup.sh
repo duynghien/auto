@@ -77,6 +77,30 @@ ask_yes_no() {
   esac
 }
 
+get_mysql_client_password() {
+  local conf_file="/etc/mysql/conf.d/my.cnf"
+  local password=""
+
+  if [ ! -f "$conf_file" ]; then
+    echo ""
+    return 0
+  fi
+
+  password="$(awk '
+    BEGIN { in_client=0 }
+    /^[[:space:]]*\[client\][[:space:]]*$/ { in_client=1; next }
+    /^[[:space:]]*\[[^]]+\][[:space:]]*$/ { in_client=0 }
+    in_client && /^[[:space:]]*password[[:space:]]*=/ {
+      sub(/^[[:space:]]*password[[:space:]]*=[[:space:]]*/, "", $0)
+      gsub(/[[:space:]]+$/, "", $0)
+      print
+      exit
+    }
+  ' "$conf_file")"
+
+  echo "$password"
+}
+
 echo "============================================================"
 echo "      CÀI ĐẶT WORDOPS BACKUP (LẦN ĐẦU)"
 echo "============================================================"
@@ -115,7 +139,12 @@ DB_DUMP_TIMEOUT_SECONDS="$(ask_value "- Timeout cho mỗi lần dump DB (giây)"
 DB_DUMP_RETRIES="$(ask_value "- Số lần retry dump DB" "3")"
 DB_DUMP_BACKOFF_SECONDS="$(ask_value "- Backoff base giữa các lần retry (giây)" "10")"
 MYSQL_USER="$(ask_value "- User DB fallback (khi wp-config thiếu DB_USER)" "root")"
-MYSQL_PASSWORD="$(ask_value "- Password DB fallback (có thể để trống)" "")"
+MYSQL_PASSWORD="$(get_mysql_client_password)"
+if [ -n "$MYSQL_PASSWORD" ]; then
+  echo "- Đã tự động lấy MYSQL_PASSWORD từ /etc/mysql/conf.d/my.cnf"
+else
+  echo "[CẢNH BÁO] Không tìm thấy password trong /etc/mysql/conf.d/my.cnf, MYSQL_PASSWORD sẽ để trống."
+fi
 
 echo ""
 echo "[Bước 5/5] Cấu hình Telegram"
