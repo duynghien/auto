@@ -5,6 +5,7 @@ Bộ script backup/restore tối ưu cho server WordOps chạy WordPress.
 Mục tiêu:
 - Chạy ổn định, tránh chồng job.
 - Backup local an toàn theo kiểu atomic.
+- Backup source theo cấu trúc WordOps: `htdocs`, `conf`, `wp-config.php` (nếu có), bỏ `logs`.
 - Dump DB có retry + timeout.
 - Upload Google Drive bằng rclone.
 - Thông báo Telegram rõ ràng (start + finish).

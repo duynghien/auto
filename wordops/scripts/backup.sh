@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 # BACKUP SCRIPT - WordOps / WordPress
-# - Sao lưu source (htdocs) + database theo từng site
+# - Sao lưu source (htdocs + conf + wp-config.php nếu có) + database theo từng site
 # - Ghi dữ liệu local theo kiểu atomic (staging -> swap)
 # - Upload Google Drive + dọn bản cũ theo retention
 # - Thông báo Telegram đầu/cuối + chi tiết
@@ -456,23 +456,41 @@ backup_site() {
     fi
   fi
 
-  # Source backup (WordOps: htdocs)
-  local src_dir="$site_path/htdocs"
+  # Source backup (WordOps: htdocs + conf + wp-config.php nếu có, bỏ logs)
+  local src_root="$site_path"
   local src_file="$site_stage_dir/source_${site_name}_${DATETIME}.tar.gz"
+  local source_items=()
+  local has_htdocs=0
 
-  if [ -d "$src_dir" ]; then
-    log "  📁 Source: $src_dir"
+  if [ -d "$src_root/htdocs" ]; then
+    source_items+=("htdocs")
+    has_htdocs=1
+  fi
+
+  if [ -d "$src_root/conf" ]; then
+    source_items+=("conf")
+  else
+    log "  ⚠️ Không có thư mục conf, vẫn tiếp tục backup source"
+  fi
+
+  if [ -f "$src_root/wp-config.php" ]; then
+    source_items+=("wp-config.php")
+  fi
+
+  if [ "$has_htdocs" -eq 1 ]; then
+    log "  📁 Source root: $src_root"
+    log "  📦 Thành phần source: ${source_items[*]}"
     if tar -czf "$src_file" \
-      --exclude='./wp-content/cache' \
-      --exclude='./wp-content/wflogs' \
-      --exclude='./wp-content/updraft' \
-      --exclude='./wp-content/ai1wm-backups' \
-      --exclude='./wp-content/backups' \
-      --exclude='./wp-content/uploads/backup*' \
-      --exclude='./wp-content/uploads/wp-clone*' \
-      --exclude='./cache' \
-      --exclude='./logs' \
-      -C "$src_dir" . 2>>"$LOG_FILE"; then
+      --exclude='htdocs/wp-content/cache' \
+      --exclude='htdocs/wp-content/wflogs' \
+      --exclude='htdocs/wp-content/updraft' \
+      --exclude='htdocs/wp-content/ai1wm-backups' \
+      --exclude='htdocs/wp-content/backups' \
+      --exclude='htdocs/wp-content/uploads/backup*' \
+      --exclude='htdocs/wp-content/uploads/wp-clone*' \
+      --exclude='htdocs/cache' \
+      --exclude='htdocs/logs' \
+      -C "$src_root" "${source_items[@]}" 2>>"$LOG_FILE"; then
       if [ -s "$src_file" ]; then
         src_ok="✅"
         log "  ✅ Source backup: $src_file ($(human_size "$src_file"))"
