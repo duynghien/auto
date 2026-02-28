@@ -459,6 +459,7 @@ backup_site() {
   # Source backup (WordOps: htdocs + conf + wp-config.php nếu có, bỏ logs)
   local src_root="$site_path"
   local src_file="$site_stage_dir/source_${site_name}_${DATETIME}.tar.gz"
+  local src_err_file="$site_stage_dir/source_${site_name}_${DATETIME}.err.log"
   local source_items=()
   local has_htdocs=0
 
@@ -480,6 +481,7 @@ backup_site() {
   if [ "$has_htdocs" -eq 1 ]; then
     log "  📁 Source root: $src_root"
     log "  📦 Thành phần source: ${source_items[*]}"
+    rm -f "$src_err_file"
     if tar -czf "$src_file" \
       --exclude='htdocs/wp-content/cache' \
       --exclude='htdocs/wp-content/wflogs' \
@@ -490,7 +492,7 @@ backup_site() {
       --exclude='htdocs/wp-content/uploads/wp-clone*' \
       --exclude='htdocs/cache' \
       --exclude='htdocs/logs' \
-      -C "$src_root" "${source_items[@]}" 2>>"$LOG_FILE"; then
+      -C "$src_root" "${source_items[@]}" 2> "$src_err_file"; then
       if [ -s "$src_file" ]; then
         src_ok="✅"
         log "  ✅ Source backup: $src_file ($(human_size "$src_file"))"
@@ -499,8 +501,18 @@ backup_site() {
         site_errors=$((site_errors+1))
       fi
     else
-      log "  ❌ Lỗi backup source"
-      site_errors=$((site_errors+1))
+      if [ -s "$src_err_file" ]; then
+        sed 's/^/    /' "$src_err_file" >> "$LOG_FILE"
+      fi
+
+      if [ -s "$src_file" ] && [ -s "$src_err_file" ] && \
+        ! grep -Ev "file changed as we read it|File removed before we read it|^$" "$src_err_file" >/dev/null; then
+        src_ok="✅"
+        log "  ⚠️ Source có warning runtime (file thay đổi/xoá khi nén), chấp nhận và tiếp tục."
+      else
+        log "  ❌ Lỗi backup source (chi tiết: $src_err_file, log: $LOG_FILE)"
+        site_errors=$((site_errors+1))
+      fi
     fi
   else
     log "  ❌ Thiếu thư mục htdocs"
