@@ -37,9 +37,11 @@ Mục tiêu:
 
 ## Cài đặt nhanh (lần đầu)
 
-Chạy setup tương tác:
+Repo này nằm trong project tổng hợp `auto`, bạn cần clone về:
 
 ```bash
+git clone https://github.com/duynghien/auto.git
+cd auto/wordops
 sudo bash setup.sh
 ```
 
@@ -105,18 +107,3 @@ Khuyến nghị: test restore ít nhất 1 site/tháng trên môi trường stag
 - Chỉ lưu token/password trong `backup.env`.
 - Đặt quyền file cấu hình: `chmod 600 /etc/backup/backup.env`.
 - Nếu lộ token/password, phải rotate ngay.
-
-## Đẩy lên GitHub
-
-Trong thư mục repo này:
-
-```bash
-git init
-git add .
-git commit -m "feat: wordops backup kit with setup and restore"
-git branch -M main
-git remote add origin https://github.com/duynghien/auto/wordops.git
-git push -u origin main
-```
-
-Nếu repo từ xa đã có sẵn nội dung, hãy `git pull --rebase origin main` trước khi push.

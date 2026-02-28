@@ -19,6 +19,7 @@ lib-cov/
 **/.env.production
 **/.env.development
 **/.env.test
+**/backup.env
 !**/.env.example
 !**/.env.test.example
 
