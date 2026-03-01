@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  spacebot:
+    image: ghcr.io/spacedriveapp/spacebot:latest
+    container_name: spacebot
+    restart: unless-stopped
+    ports:
+      - "19898:19898"
+    volumes:
+      - ./data:/data
+    environment:
+      - SPACEBOT_DIR=/data
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:-}
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN:-}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
