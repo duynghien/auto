@@ -134,6 +134,7 @@ if [[ "$LANG" == "vi" ]]; then
             echo "    2) LAN / Home Server (nhập IP thủ công)"
         fi
     fi
+    echo "    3) Domain / VPS công khai (https://your-domain.com)"
 else
     echo "  Access mode:"
     echo ""
@@ -155,9 +156,10 @@ else
             echo "    2) LAN / Home Server (enter IP manually)"
         fi
     fi
+    echo "    3) Domain / Public VPS (https://your-domain.com)"
 fi
 echo ""
-read -p "  Enter 1 or 2 [$DEFAULT_NET]: " NET_CHOICE
+read -p "  Enter 1, 2 or 3 [$DEFAULT_NET]: " NET_CHOICE
 NET_CHOICE=${NET_CHOICE:-$DEFAULT_NET}
 
 if [[ "$NET_CHOICE" == "1" ]]; then
@@ -165,6 +167,7 @@ if [[ "$NET_CHOICE" == "1" ]]; then
     LAN_IP="localhost"
     APP_URL="http://localhost:3210"
     S3_PUBLIC_ENDPOINT="http://localhost:9000"
+    S3_INTERNAL_ENDPOINT="http://network-service:9000"
 elif [[ "$NET_CHOICE" == "2" ]]; then
     NETWORK_MODE="lan"
     if [ -n "$LAN_IP" ]; then
@@ -189,11 +192,47 @@ elif [[ "$NET_CHOICE" == "2" ]]; then
     fi
     APP_URL="http://${LAN_IP}:3210"
     S3_PUBLIC_ENDPOINT="http://${LAN_IP}:9000"
+    S3_INTERNAL_ENDPOINT="http://network-service:9000"
+elif [[ "$NET_CHOICE" == "3" ]]; then
+    NETWORK_MODE="domain"
+    echo ""
+    if [[ "$LANG" == "vi" ]]; then
+        echo "  Nhập domain của LobeHub (ví dụ: https://lobe.example.com):"
+        read -p "  Domain LobeHub: " APP_DOMAIN
+        echo ""
+        echo "  Nhập domain/URL công khai của S3 storage:"
+        echo "  (Để trống = dùng S3 nội bộ qua proxy - khuyến nghị)"
+        echo "  Ví dụ: https://s3.example.com  hoặc  https://lobe.example.com/s3"
+        read -p "  Domain S3 (Enter để bỏ qua): " S3_DOMAIN_INPUT
+    else
+        echo "  Enter your LobeHub domain (e.g. https://lobe.example.com):"
+        read -p "  LobeHub domain: " APP_DOMAIN
+        echo ""
+        echo "  Enter public S3 storage domain/URL:"
+        echo "  (Leave empty = use S3 via internal proxy - recommended)"
+        echo "  Example: https://s3.example.com  or  https://lobe.example.com/s3"
+        read -p "  S3 domain (Enter to skip): " S3_DOMAIN_INPUT
+    fi
+
+    # Strip trailing slash from domain
+    APP_DOMAIN=${APP_DOMAIN%/}
+    APP_URL="$APP_DOMAIN"
+
+    if [ -n "$S3_DOMAIN_INPUT" ]; then
+        S3_PUBLIC_ENDPOINT="${S3_DOMAIN_INPUT%/}"
+    else
+        # Use app URL as S3 proxy (LobeHub proxies S3 by default with S3_PROXY=1)
+        S3_PUBLIC_ENDPOINT="$APP_DOMAIN"
+    fi
+    S3_INTERNAL_ENDPOINT="http://network-service:9000"
+    pok "Domain: $APP_URL"
+    pok "S3 public endpoint: $S3_PUBLIC_ENDPOINT"
 else
     NETWORK_MODE="localhost"
     LAN_IP="localhost"
     APP_URL="http://localhost:3210"
     S3_PUBLIC_ENDPOINT="http://localhost:9000"
+    S3_INTERNAL_ENDPOINT="http://network-service:9000"
 fi
 
 if [[ "$LANG" == "vi" ]]; then
@@ -201,7 +240,11 @@ if [[ "$LANG" == "vi" ]]; then
 else
     pok "Platform: $PLATFORM_LABEL"
 fi
-pok "Mode: $( [[ "$NETWORK_MODE" == "lan" ]] && echo "LAN ($LAN_IP)" || echo "Localhost" )"
+case "$NETWORK_MODE" in
+    lan)    pok "Mode: LAN ($LAN_IP)" ;;
+    domain) pok "Mode: Domain ($APP_URL)" ;;
+    *)      pok "Mode: Localhost" ;;
+esac
 
 # ========================================
 # i18n: All translatable strings
@@ -698,6 +741,9 @@ S3_SERVICE=$S3_SERVICE
 # ANTHROPIC_API_KEY=sk-ant-xxx
 # GOOGLE_API_KEY=xxx
 # OLLAMA_PROXY_URL=http://host.docker.internal:11434
+
+# Network mode
+NETWORK_MODE=$NETWORK_MODE
 ENVEOF
 
 pok "$(t ok_env_saved)"
@@ -872,15 +918,16 @@ DCOMPOSE
 
 # Add S3 service
 if [[ "$S3_SERVICE" == "rustfs" ]]; then
-cat >> docker-compose.yml << 'DCOMPOSE'
+cat >> docker-compose.yml << DCOMPOSE
   rustfs:
     image: rustfs/rustfs:latest
     container_name: lobe-rustfs
     network_mode: "service:network-service"
     environment:
       - RUSTFS_CONSOLE_ENABLE=true
-      - RUSTFS_ACCESS_KEY=${RUSTFS_ACCESS_KEY}
-      - RUSTFS_SECRET_KEY=${RUSTFS_SECRET_KEY}
+      - RUSTFS_ACCESS_KEY=\${RUSTFS_ACCESS_KEY}
+      - RUSTFS_SECRET_KEY=\${RUSTFS_SECRET_KEY}
+      - RUSTFS_API_CORS_ORIGINS=$APP_URL
     volumes:
       - rustfs_data:/data
     healthcheck:
@@ -889,7 +936,7 @@ cat >> docker-compose.yml << 'DCOMPOSE'
       timeout: 3s
       retries: 30
     command:
-      ["--access-key", "${RUSTFS_ACCESS_KEY}", "--secret-key", "${RUSTFS_SECRET_KEY}", "/data"]
+      ["--access-key", "\${RUSTFS_ACCESS_KEY}", "--secret-key", "\${RUSTFS_SECRET_KEY}", "/data"]
 
   rustfs-init:
     image: minio/mc:latest
@@ -903,7 +950,7 @@ cat >> docker-compose.yml << 'DCOMPOSE'
     command: >
       -c '
         set -eux;
-        mc alias set rustfs "http://network-service:9000" "${RUSTFS_ACCESS_KEY}" "${RUSTFS_SECRET_KEY}";
+        mc alias set rustfs "http://network-service:9000" "\${RUSTFS_ACCESS_KEY}" "\${RUSTFS_SECRET_KEY}";
         mc mb "rustfs/lobe" --ignore-existing;
         mc anonymous set-json "/bucket.config.json" "rustfs/lobe" || mc anonymous set download "rustfs/lobe";
       '
@@ -919,15 +966,16 @@ DCOMPOSE
       rustfs-init:
         condition: service_completed_successfully"
 else
-cat >> docker-compose.yml << 'DCOMPOSE'
+cat >> docker-compose.yml << DCOMPOSE
   minio:
     image: minio/minio:latest
     container_name: lobe-minio
     network_mode: "service:network-service"
     environment:
-      - MINIO_ROOT_USER=${S3_ACCESS_KEY}
-      - MINIO_ROOT_PASSWORD=${S3_SECRET_KEY}
-      - MINIO_API_CORS_ORIGIN=${APP_URL}
+      - MINIO_ROOT_USER=\${S3_ACCESS_KEY}
+      - MINIO_ROOT_PASSWORD=\${S3_SECRET_KEY}
+      - MINIO_API_CORS_ORIGIN=$APP_URL
+      - MINIO_BROWSER_REDIRECT_URL=$APP_URL
     volumes:
       - minio_data:/data
     command: server --console-address ":9001" /data
@@ -949,7 +997,7 @@ cat >> docker-compose.yml << 'DCOMPOSE'
     command: >
       -c '
         set -eux;
-        mc alias set minio "http://network-service:9000" "${S3_ACCESS_KEY}" "${S3_SECRET_KEY}";
+        mc alias set minio "http://network-service:9000" "\${S3_ACCESS_KEY}" "\${S3_SECRET_KEY}";
         mc mb "minio/lobe" --ignore-existing;
         mc anonymous set-json "/bucket.config.json" "minio/lobe" || mc anonymous set download "minio/lobe";
       '
@@ -1013,7 +1061,9 @@ $S3_DEPENDS
       - REDIS_URL=redis://redis:6379
       - REDIS_PREFIX=lobechat
       - REDIS_TLS=0
-      # S3 Storage (via internal network)
+      # S3 Storage
+      # Internal endpoint (container-to-container) always uses internal network
+      - S3_ENDPOINT=http://network-service:9000
       - S3_BUCKET=\${RUSTFS_LOBE_BUCKET:-lobe}
       - S3_ENABLE_PATH_STYLE=1
       - S3_ACCESS_KEY=\${RUSTFS_ACCESS_KEY}
@@ -1021,6 +1071,8 @@ $S3_DEPENDS
       - S3_SECRET_ACCESS_KEY=\${RUSTFS_SECRET_KEY}
       - S3_SET_ACL=0
       - S3_PROXY=1
+      # Public URL for S3 (browser-facing, for upload/download presigned URLs)
+      - S3_PUBLIC_DOMAIN=$S3_PUBLIC_ENDPOINT
       # Image Vision
       - LLM_VISION_IMAGE_USE_BASE64=1
       # Online Search (SearXNG)
