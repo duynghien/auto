@@ -84,6 +84,17 @@ normalize_domain_url() {
     echo "$normalized"
 }
 
+# Read a single key from an existing .env file without sourcing it.
+read_env_value() {
+    local key="$1"
+    local file="$2"
+    local line=""
+
+    [ -f "$file" ] || return 0
+    line=$(grep -m1 "^${key}=" "$file" 2>/dev/null || true)
+    [ -n "$line" ] && echo "${line#*=}"
+}
+
 # ========================================
 # Language Selection / Chọn ngôn ngữ
 # ========================================
@@ -215,17 +226,17 @@ elif [[ "$NET_CHOICE" == "3" ]]; then
         read -p "  Domain LobeHub: " APP_DOMAIN
         echo ""
         echo "  Nhập domain/URL công khai của S3 storage:"
-        echo "  (Để trống = dùng S3 nội bộ qua proxy - khuyến nghị)"
+        echo "  (Bắt buộc trong chế độ Domain để upload file/ảnh hoạt động)"
         echo "  Ví dụ: https://s3.example.com  hoặc  https://lobe.example.com/s3"
-        read -p "  Domain S3 (Enter để bỏ qua): " S3_DOMAIN_INPUT
+        read -p "  Domain S3 (bắt buộc): " S3_DOMAIN_INPUT
     else
         echo "  Enter your LobeHub domain (e.g. https://lobe.example.com):"
         read -p "  LobeHub domain: " APP_DOMAIN
         echo ""
         echo "  Enter public S3 storage domain/URL:"
-        echo "  (Leave empty = use S3 via internal proxy - recommended)"
+        echo "  (Required in Domain mode so file/image upload works)"
         echo "  Example: https://s3.example.com  or  https://lobe.example.com/s3"
-        read -p "  S3 domain (Enter to skip): " S3_DOMAIN_INPUT
+        read -p "  S3 domain (required): " S3_DOMAIN_INPUT
     fi
 
     APP_DOMAIN=$(normalize_domain_url "$APP_DOMAIN")
@@ -234,8 +245,8 @@ elif [[ "$NET_CHOICE" == "3" ]]; then
     if [ -n "$S3_DOMAIN_INPUT" ]; then
         S3_PUBLIC_ENDPOINT=$(normalize_domain_url "$S3_DOMAIN_INPUT")
     else
-        # Use app URL as S3 proxy (LobeHub proxies S3 by default with S3_PROXY=1)
-        S3_PUBLIC_ENDPOINT="$APP_DOMAIN"
+        perr "S3 domain is required in Domain mode. Please run setup again and provide a public S3 domain."
+        exit 1
     fi
     S3_INTERNAL_ENDPOINT="http://network-service:9000"
     pok "Domain: $APP_URL"
@@ -600,15 +611,20 @@ pok "Directory: $INSTALL_DIR"
 # Preserve existing secrets if .env exists
 if [ -f .env ]; then
     pwn "$(t warn_env_found)"
-    source .env 2>/dev/null || true
+    OLD_POSTGRES_PASSWORD=$(read_env_value "POSTGRES_PASSWORD" ".env")
+    OLD_RUSTFS_ACCESS_KEY=$(read_env_value "RUSTFS_ACCESS_KEY" ".env")
+    OLD_RUSTFS_SECRET_KEY=$(read_env_value "RUSTFS_SECRET_KEY" ".env")
+    OLD_AUTH_SECRET=$(read_env_value "AUTH_SECRET" ".env")
+    OLD_KEY_VAULTS_SECRET=$(read_env_value "KEY_VAULTS_SECRET" ".env")
+    OLD_JWKS_KEY=$(read_env_value "JWKS_KEY" ".env")
 fi
 
 # Generate secrets if not exist
-[ -z "${POSTGRES_PASSWORD:-}" ] && POSTGRES_PASSWORD=$(openssl rand -base64 16 | tr -d '=+/')
-[ -z "${RUSTFS_ACCESS_KEY:-}" ] && RUSTFS_ACCESS_KEY="admin"
-[ -z "${RUSTFS_SECRET_KEY:-}" ] && RUSTFS_SECRET_KEY=$(openssl rand -base64 16 | tr -d '=+/')
-[ -z "${AUTH_SECRET:-}" ] && AUTH_SECRET=$(openssl rand -base64 32)
-[ -z "${KEY_VAULTS_SECRET:-}" ] && KEY_VAULTS_SECRET=$(openssl rand -base64 32)
+[ -z "${POSTGRES_PASSWORD:-}" ] && POSTGRES_PASSWORD="${OLD_POSTGRES_PASSWORD:-$(openssl rand -base64 16 | tr -d '=+/')}"
+[ -z "${RUSTFS_ACCESS_KEY:-}" ] && RUSTFS_ACCESS_KEY="${OLD_RUSTFS_ACCESS_KEY:-admin}"
+[ -z "${RUSTFS_SECRET_KEY:-}" ] && RUSTFS_SECRET_KEY="${OLD_RUSTFS_SECRET_KEY:-$(openssl rand -base64 16 | tr -d '=+/')}"
+[ -z "${AUTH_SECRET:-}" ] && AUTH_SECRET="${OLD_AUTH_SECRET:-$(openssl rand -base64 32)}"
+[ -z "${KEY_VAULTS_SECRET:-}" ] && KEY_VAULTS_SECRET="${OLD_KEY_VAULTS_SECRET:-$(openssl rand -base64 32)}"
 
 # Also set MinIO vars (same as RustFS for compatibility)
 S3_ACCESS_KEY="${RUSTFS_ACCESS_KEY}"
@@ -616,11 +632,15 @@ S3_SECRET_KEY="${RUSTFS_SECRET_KEY}"
 
 # Generate JWKS
 if [ -z "${JWKS_KEY:-}" ]; then
-    pok "$(t ok_jwks)"
-    TMP_PEM=$(mktemp)
-    openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$TMP_PEM" 2>/dev/null
+    if [ -n "${OLD_JWKS_KEY:-}" ]; then
+        JWKS_KEY="$OLD_JWKS_KEY"
+        pok "JWKS Key: reused"
+    else
+        pok "$(t ok_jwks)"
+        TMP_PEM=$(mktemp)
+        openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$TMP_PEM" 2>/dev/null
 
-    JWKS_KEY=$(python3 -c "
+        JWKS_KEY=$(python3 -c "
 import subprocess,json,base64,secrets,re
 def b64u(n):
     b = n.to_bytes((n.bit_length()+7)//8, 'big')
@@ -649,7 +669,8 @@ jwk = {
 }
 print(json.dumps({'keys': [jwk]}, separators=(',', ':')))
 ")
-    rm -f "$TMP_PEM"
+        rm -f "$TMP_PEM"
+    fi
 else
     pok "JWKS Key: reused"
 fi
@@ -743,8 +764,8 @@ RUSTFS_LOBE_BUCKET=lobe
 S3_PUBLIC_DOMAIN=$S3_PUBLIC_ENDPOINT
 S3_ACCESS_KEY=$S3_ACCESS_KEY
 S3_SECRET_KEY=$S3_SECRET_KEY
-# S3_ENDPOINT always uses internal container network (override via container environment)
-S3_ENDPOINT=http://network-service:9000
+# S3 endpoint must be browser-accessible for pre-signed upload URLs
+S3_ENDPOINT=$S3_PUBLIC_ENDPOINT
 
 # S3 Storage choice
 S3_SERVICE=$S3_SERVICE
@@ -1076,17 +1097,14 @@ $S3_DEPENDS
       - REDIS_PREFIX=lobechat
       - REDIS_TLS=0
       # S3 Storage
-      # Internal endpoint (container-to-container) always uses internal network
-      - S3_ENDPOINT=http://network-service:9000
+      # S3 endpoint for pre-signed upload URL generation (must be reachable from browser)
+      - S3_ENDPOINT=\${S3_ENDPOINT}
       - S3_BUCKET=\${RUSTFS_LOBE_BUCKET:-lobe}
       - S3_ENABLE_PATH_STYLE=1
-      - S3_ACCESS_KEY=\${RUSTFS_ACCESS_KEY}
-      - S3_ACCESS_KEY_ID=\${RUSTFS_ACCESS_KEY}
-      - S3_SECRET_ACCESS_KEY=\${RUSTFS_SECRET_KEY}
+      - S3_ACCESS_KEY=\${S3_ACCESS_KEY}
+      - S3_ACCESS_KEY_ID=\${S3_ACCESS_KEY}
+      - S3_SECRET_ACCESS_KEY=\${S3_SECRET_KEY}
       - S3_SET_ACL=0
-      - S3_PROXY=1
-      # Public URL for S3 (browser-facing, for upload/download presigned URLs)
-      - S3_PUBLIC_DOMAIN=$S3_PUBLIC_ENDPOINT
       # Image Vision
       - LLM_VISION_IMAGE_USE_BASE64=1
       # Online Search (SearXNG)
@@ -1136,7 +1154,7 @@ cd "$INSTALL_DIR"
 
 # Stop any existing containers
 pok "$(t ok_stop_old)"
-docker compose down 2>/dev/null || true
+docker compose down --remove-orphans 2>/dev/null || true
 
 # Pull images
 pok "$(t ok_pull)"
