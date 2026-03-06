@@ -1253,6 +1253,33 @@ else
     curl -sf http://localhost:9000/minio/health/live &>/dev/null && pok "MinIO: OK" || { perr "$(t err_minio_verify)"; ALL_OK=false; }
 fi
 
+# Verify public S3 endpoint in domain mode (required for browser uploads)
+if [[ "$NETWORK_MODE" == "domain" ]]; then
+    if [[ "$APP_URL" =~ ^https:// && "$S3_PUBLIC_ENDPOINT" =~ ^http:// ]]; then
+        perr "S3 public endpoint uses HTTP while APP_URL uses HTTPS (mixed content will block uploads)."
+        ALL_OK=false
+    else
+        S3_PUBLIC_OK=false
+        if [[ "$S3_SERVICE" == "rustfs" ]]; then
+            if curl -skf --max-time 8 "${S3_PUBLIC_ENDPOINT}/health" >/dev/null 2>&1; then
+                S3_PUBLIC_OK=true
+            fi
+        else
+            if curl -skf --max-time 8 "${S3_PUBLIC_ENDPOINT}/minio/health/live" >/dev/null 2>&1; then
+                S3_PUBLIC_OK=true
+            fi
+        fi
+
+        if [ "$S3_PUBLIC_OK" = true ]; then
+            pok "S3 Public Endpoint: OK ($S3_PUBLIC_ENDPOINT)"
+        else
+            perr "S3 Public Endpoint: ERROR ($S3_PUBLIC_ENDPOINT)"
+            pwn "Upload will fail until this URL is reachable from browser with valid protocol/TLS."
+            ALL_OK=false
+        fi
+    fi
+fi
+
 # Test SearXNG
 SEARXNG_OK=false
 for i in {1..10}; do
@@ -1327,10 +1354,10 @@ case "$1" in
   search-test)
     echo "🔍 Testing SearXNG..."
     QUERY="${2:-test}"
-    RESULT=$(docker exec lobe-searxng wget -qO- "http://localhost:8080/search?q=${QUERY}&format=json" 2>/dev/null)
-    if echo "$RESULT" | grep -q '"results"'; then
+    RESULT=$(docker exec lobe-searxng wget -qO- "http://localhost:8080/search?q=${QUERY}" 2>/dev/null)
+    if echo "$RESULT" | grep -qi "<html"; then
       echo "✅ SearXNG OK! Search working."
-      echo "$RESULT" | python3 -m json.tool 2>/dev/null | head -20
+      echo "Query: $QUERY"
     else
       echo "❌ SearXNG not responding. Check logs: ./lobe.sh logs searxng"
     fi
@@ -1356,6 +1383,43 @@ case "$1" in
     echo ""
     echo "Console: http://localhost:9001"
     ;;
+  s3-test)
+    echo "🧪 Testing S3 endpoint for browser uploads..."
+    APP=$(grep '^APP_URL=' .env 2>/dev/null | cut -d= -f2- || true)
+    S3=$(grep '^S3_ENDPOINT=' .env 2>/dev/null | cut -d= -f2- || true)
+    SVC=$(grep '^S3_SERVICE=' .env 2>/dev/null | cut -d= -f2- || echo 'rustfs')
+    echo "APP_URL: $APP"
+    echo "S3_ENDPOINT: $S3"
+    if [[ "$APP" =~ ^https:// && "$S3" =~ ^http:// ]]; then
+      echo "❌ Mixed content: HTTPS app cannot upload to HTTP S3 endpoint."
+      exit 1
+    fi
+    if [[ "$SVC" == "minio" ]]; then
+      PATH_CHECK="/minio/health/live"
+    else
+      PATH_CHECK="/health"
+    fi
+    if curl -skf --max-time 8 "${S3}${PATH_CHECK}" >/dev/null 2>&1; then
+      echo "✅ S3 endpoint reachable: ${S3}${PATH_CHECK}"
+    else
+      echo "❌ S3 endpoint not reachable: ${S3}${PATH_CHECK}"
+      echo "   Check reverse proxy/TLS for your S3 domain."
+      exit 1
+    fi
+    ORIGIN=$(echo "$APP" | sed 's#/$##')
+    CORS=$(curl -skI -X OPTIONS "${S3}/" \
+      -H "Origin: ${ORIGIN}" \
+      -H "Access-Control-Request-Method: PUT" \
+      -H "Access-Control-Request-Headers: content-type" 2>/dev/null | tr -d '\r')
+    CORS_ORIGIN=$(echo "$CORS" | sed -n 's/^Access-Control-Allow-Origin: //Ip' | head -n 1)
+    if [[ "$CORS_ORIGIN" == "*" || "$CORS_ORIGIN" == "$ORIGIN" ]]; then
+      echo "✅ S3 CORS preflight allows origin: ${ORIGIN}"
+    else
+      echo "❌ S3 CORS preflight does not allow origin: ${ORIGIN}"
+      echo "   Check CORS config on S3 service/proxy."
+      exit 1
+    fi
+    ;;
   *)
     echo "LobeHub Helper v4.0"
     echo ""
@@ -1369,6 +1433,7 @@ case "$1" in
     echo "  logs [svc]   - View logs (default: lobe)"
     echo "  status       - Show service status"
     echo "  search-test  - Test SearXNG search"
+    echo "  s3-test      - Test S3 upload endpoint reachability"
     echo "  secrets      - Show secrets file"
     echo "  s3-login     - Show S3 storage credentials"
     echo "  reset        - ⚠️  Stop and DELETE all data"
