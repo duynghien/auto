@@ -70,6 +70,20 @@ pheader() {
     echo "================================================================${NC}"
 }
 
+# Normalize domain/url:
+# - remove trailing slash
+# - prepend https:// if scheme is missing
+normalize_domain_url() {
+    local raw="$1"
+    local normalized="${raw%/}"
+
+    if [[ -n "$normalized" && ! "$normalized" =~ ^https?:// ]]; then
+        normalized="https://$normalized"
+    fi
+
+    echo "$normalized"
+}
+
 # ========================================
 # Language Selection / Chọn ngôn ngữ
 # ========================================
@@ -214,12 +228,11 @@ elif [[ "$NET_CHOICE" == "3" ]]; then
         read -p "  S3 domain (Enter to skip): " S3_DOMAIN_INPUT
     fi
 
-    # Strip trailing slash from domain
-    APP_DOMAIN=${APP_DOMAIN%/}
+    APP_DOMAIN=$(normalize_domain_url "$APP_DOMAIN")
     APP_URL="$APP_DOMAIN"
 
     if [ -n "$S3_DOMAIN_INPUT" ]; then
-        S3_PUBLIC_ENDPOINT="${S3_DOMAIN_INPUT%/}"
+        S3_PUBLIC_ENDPOINT=$(normalize_domain_url "$S3_DOMAIN_INPUT")
     else
         # Use app URL as S3 proxy (LobeHub proxies S3 by default with S3_PROXY=1)
         S3_PUBLIC_ENDPOINT="$APP_DOMAIN"
@@ -699,7 +712,7 @@ cat > .env << ENVEOF
 $(t env_warning)
 # Generated: $(date '+%Y-%m-%d %H:%M:%S')
 # Platform: $PLATFORM_LABEL
-# Network mode: $NETWORK_MODE ($LAN_IP)
+# Network mode: $NETWORK_MODE
 # =================================================================
 
 # ===========================
@@ -730,8 +743,8 @@ RUSTFS_LOBE_BUCKET=lobe
 S3_PUBLIC_DOMAIN=$S3_PUBLIC_ENDPOINT
 S3_ACCESS_KEY=$S3_ACCESS_KEY
 S3_SECRET_KEY=$S3_SECRET_KEY
-S3_ENDPOINT=$S3_PUBLIC_ENDPOINT
-RUSTFS_LOBE_BUCKET=lobe
+# S3_ENDPOINT always uses internal container network (override via container environment)
+S3_ENDPOINT=http://network-service:9000
 
 # S3 Storage choice
 S3_SERVICE=$S3_SERVICE
@@ -770,13 +783,8 @@ cat > bucket.config.json << 'BUCKETEOF'
 BUCKETEOF
 pok "bucket.config.json: OK"
 
-# Download SearXNG settings
-SEARXNG_URL="https://raw.githubusercontent.com/lobehub/lobe-chat/HEAD/docker-compose/deploy/searxng-settings.yml"
-if curl -sfL "$SEARXNG_URL" -o searxng-settings.yml; then
-    pok "searxng-settings.yml: OK (official LobeHub config)"
-else
-    pwn "$(t warn_searxng_fallback)"
-    cat > searxng-settings.yml << SEARXNGEOF
+# Create stable SearXNG settings (minimal engines to avoid broken/deprecated modules)
+cat > searxng-settings.yml << SEARXNGEOF
 use_default_settings: true
 
 general:
@@ -788,11 +796,6 @@ search:
   autocomplete: ""
   default_lang: ""
 
-engines:
-  - name: google
-    engine: google
-    shortcut: g
-
 server:
   port: 8080
   bind_address: '0.0.0.0'
@@ -800,9 +803,21 @@ server:
   limiter: false
   image_proxy: false
   method: 'POST'
+
+engines:
+  - name: duckduckgo
+    engine: duckduckgo
+    shortcut: ddg
+
+  - name: brave
+    engine: brave
+    shortcut: br
+
+  - name: qwant
+    engine: qwant
+    shortcut: qw
 SEARXNGEOF
-    pok "searxng-settings.yml: OK (fallback config)"
-fi
+pok "searxng-settings.yml: OK (stable minimal config)"
 
 # ========================================
 # Step 7: Create Docker Compose
@@ -1052,7 +1067,6 @@ $S3_DEPENDS
       - JWKS_KEY=\${JWKS_KEY}
       # App URL - CRITICAL: must be the publicly accessible URL for OAuth/token callbacks
       - APP_URL=$APP_URL
-      - NEXT_PUBLIC_AUTH_URL=$APP_URL
       # Auth Registration Control
       - AUTH_ALLOWED_EMAILS=\${AUTH_ALLOWED_EMAILS}
       # Database
@@ -1236,7 +1250,19 @@ if [ "$SEARXNG_OK" = false ]; then
     ALL_OK=false
 fi
 
-curl -sf http://localhost:3210 >/dev/null && pok "LobeHub: OK" || { perr "LobeHub: ERROR"; ALL_OK=false; }
+LOBE_OK=false
+for i in {1..20}; do
+    if curl -sf http://localhost:3210 >/dev/null 2>&1; then
+        pok "LobeHub: OK"
+        LOBE_OK=true
+        break
+    fi
+    sleep 2
+done
+if [ "$LOBE_OK" = false ]; then
+    perr "LobeHub: ERROR"
+    ALL_OK=false
+fi
 
 # ========================================
 # Step 10: Create Helper Script & Finish
