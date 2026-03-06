@@ -395,6 +395,19 @@ t() {
             [[ "$LANG" == "vi" ]] && text="  • Secrets được lưu trong .env - backup file này nếu cần!" || text="  • Secrets are stored in .env - back up this file if needed!";;
         note_3)
             [[ "$LANG" == "vi" ]] && text="  • Test search: ./lobe.sh search-test 'weather today'" || text="  • Test search: ./lobe.sh search-test 'weather today'";;
+        # Auth allowed emails
+        allowed_emails_title)
+            [[ "$LANG" == "vi" ]] && text="Giới hạn đăng ký (AUTH_ALLOWED_EMAILS):" || text="Registration restriction (AUTH_ALLOWED_EMAILS):";;
+        allowed_emails_info)
+            [[ "$LANG" == "vi" ]] && text="  Whitelist domain hoặc email được phép đăng ký. Để trống = cho phép tất cả." || text="  Whitelist domains or emails allowed to register. Leave empty = allow all.";;
+        allowed_emails_example)
+            [[ "$LANG" == "vi" ]] && text="  Ví dụ: company.com,admin@gmail.com" || text="  Example: company.com,admin@gmail.com";;
+        allowed_emails_prompt)
+            [[ "$LANG" == "vi" ]] && text="  Nhập danh sách (Enter để bỏ qua): " || text="  Enter list (Enter to skip): ";;
+        allowed_emails_ok)
+            [[ "$LANG" == "vi" ]] && text="Giới hạn đăng ký: $1" || text="Registration restricted to: $1";;
+        allowed_emails_open)
+            [[ "$LANG" == "vi" ]] && text="Đăng ký: mở cho tất cả" || text="Registration: open to all";;
         *)
             text="[MISSING: $key]";;
     esac
@@ -613,6 +626,25 @@ fi
 pok "$(t ok_s3_choice "$S3_SERVICE_NAME")"
 
 # ========================================
+# Step 4b: Registration Restriction
+# ========================================
+echo ""
+echo "$(t allowed_emails_title)"
+echo "$(t allowed_emails_info)"
+echo "$(t allowed_emails_example)"
+echo ""
+read -p "$(t allowed_emails_prompt)" AUTH_ALLOWED_EMAILS_INPUT
+AUTH_ALLOWED_EMAILS_INPUT=${AUTH_ALLOWED_EMAILS_INPUT:-""}
+
+if [ -n "$AUTH_ALLOWED_EMAILS_INPUT" ]; then
+    AUTH_ALLOWED_EMAILS="$AUTH_ALLOWED_EMAILS_INPUT"
+    pok "$(t allowed_emails_ok "$AUTH_ALLOWED_EMAILS")"
+else
+    AUTH_ALLOWED_EMAILS=""
+    pok "$(t allowed_emails_open)"
+fi
+
+# ========================================
 # Step 5: Save .env
 # ========================================
 echo ""
@@ -638,6 +670,11 @@ APP_URL=$APP_URL
 AUTH_SECRET=$AUTH_SECRET
 KEY_VAULTS_SECRET=$KEY_VAULTS_SECRET
 JWKS_KEY=$JWKS_KEY
+
+# Auth Registration Control
+# Whitelist domains/emails allowed to register (leave empty = allow all)
+# Example: AUTH_ALLOWED_EMAILS=company.com,admin@gmail.com
+AUTH_ALLOWED_EMAILS=$AUTH_ALLOWED_EMAILS
 
 # Database (PostgreSQL)
 LOBE_DB_NAME=lobechat
@@ -961,9 +998,15 @@ $S3_DEPENDS
       redis:
         condition: service_healthy
     environment:
-      # Auth
+      # Auth - explicitly set to ensure correct token generation
       - AUTH_SECRET=\${AUTH_SECRET}
       - KEY_VAULTS_SECRET=\${KEY_VAULTS_SECRET}
+      - JWKS_KEY=\${JWKS_KEY}
+      # App URL - CRITICAL: must be the publicly accessible URL for OAuth/token callbacks
+      - APP_URL=$APP_URL
+      - NEXT_PUBLIC_AUTH_URL=$APP_URL
+      # Auth Registration Control
+      - AUTH_ALLOWED_EMAILS=\${AUTH_ALLOWED_EMAILS}
       # Database
       - DATABASE_URL=postgresql://postgres:\${POSTGRES_PASSWORD}@postgresql:5432/\${LOBE_DB_NAME:-lobechat}
       # Redis
