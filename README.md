@@ -40,6 +40,16 @@ A set of optimized scripts specifically for Raspberry Pi or ARM-based devices.
 - **Target**: Raspberry Pi 4/5, ARM servers.
 - **Features**: Installs Docker, Docker Compose, Portainer.
 
+#### 7. [Prometheus Self-Hosted Installer](./prometheus)
+Unified script for Prometheus monitoring via Docker Compose with bilingual onboarding.
+- **Target**: macOS, Raspberry Pi, VPS (AMD64/ARM64).
+- **Features**: Prometheus server, starter alert rules, Linux node-exporter, helper commands.
+
+#### 8. [Grafana Self-Hosted Installer](./grafana)
+Unified script for Grafana dashboards with pre-provisioned Prometheus integration.
+- **Target**: macOS, Raspberry Pi, VPS (AMD64/ARM64).
+- **Features**: Grafana server, Prometheus datasource provisioning, starter dashboard, helper commands.
+
 ---
 
 ### 🛠️ General Usage
@@ -97,6 +107,16 @@ Script tự động cài đặt LobeHub v2.0+ (bản database) tối ưu cho Ras
 Tập hợp các script tối ưu riêng cho Raspberry Pi hoặc các thiết bị chạy ARM.
 - **Đối tượng**: Raspberry Pi 4/5, ARM servers.
 - **Tính năng**: Cài đặt Docker, Docker Compose, Portainer.
+
+#### 7. [Prometheus Self-Hosted Installer](./prometheus)
+Script thống nhất triển khai Prometheus bằng Docker Compose với trải nghiệm song ngữ.
+- **Đối tượng**: macOS, Raspberry Pi, VPS (AMD64/ARM64).
+- **Tính năng**: Prometheus server, rule cảnh báo mẫu, Linux node-exporter, helper commands.
+
+#### 8. [Grafana Self-Hosted Installer](./grafana)
+Script thống nhất triển khai Grafana với datasource Prometheus được provision sẵn.
+- **Đối tượng**: macOS, Raspberry Pi, VPS (AMD64/ARM64).
+- **Tính năng**: Grafana server, provisioning datasource Prometheus, dashboard khởi đầu, helper commands.
 
 ---
 

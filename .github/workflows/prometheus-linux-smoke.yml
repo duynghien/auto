@@ -1,0 +1,32 @@
+name: Prometheus Linux Smoke
+
+on:
+  push:
+    paths:
+      - 'prometheus/**'
+      - '.github/workflows/prometheus-linux-smoke.yml'
+  pull_request:
+    paths:
+      - 'prometheus/**'
+      - '.github/workflows/prometheus-linux-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  smoke-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Docker versions
+        run: |
+          docker --version
+          docker compose version
+
+      - name: Run Prometheus Linux smoke test
+        env:
+          PROMETHEUS_SMOKE_PORT: "19190"
+          PROMETHEUS_SMOKE_TIMEOUT: "300"
+        run: bash prometheus/smoke-test-linux.sh
