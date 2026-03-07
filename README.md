@@ -15,22 +15,27 @@ Deployment solution for AI Agents (OpenClaw) integrated with n8n and the Model C
 - **Target**: VPS (Ubuntu 22.04+).
 - **Features**: Installs OpenClaw, n8n, MCP Server, Caddy, Postgres, Redis.
 
-#### 2. [LobeHub Mac Installer](./lobehub-mac)
+#### 2. [n8n Self-Hosted Installer](./n8n)
+Unified script for n8n via Docker Compose with optional advanced modules.
+- **Target**: macOS, Raspberry Pi, VPS (AMD64/ARM64).
+- **Features**: Optional Worker, Queue Mode, PostgreSQL, Redis, FFmpeg, Puppeteer dependencies, Task Runners.
+
+#### 3. [LobeHub Mac Installer](./lobehub-mac)
 Optimized script for Mac (M1/M2/M3/M4) using OrbStack or Docker Desktop to install LobeHub v3.0+.
 - **Target**: Mac Mini, MacBook (Apple Silicon).
 - **Features**: Optimized for M-series, ParadeDB (PostgreSQL + pg_search + pgvector), Local S3 (RustFS/MinIO), SearXNG Search.
 
-#### 3. [AnyCrawl "Max Option" Stack](./anycrawl)
+#### 4. [AnyCrawl "Max Option" Stack](./anycrawl)
 Bilingual deployment script for AnyCrawl with PostgreSQL, MinIO, Redis, and MCP integration.
 - **Target**: Mac (M1/M2/M3/M4), Raspberry Pi (4/5), VPS.
 - **Features**: PostgreSQL 17, MinIO S3, SearXNG, MCP Server (AI Interface).
 
-#### 4. [LobeHub Pi Installer](./lobehub-pi)
+#### 5. [LobeHub Pi Installer](./lobehub-pi)
 Automation script for installing LobeHub v2.0+ (database version) optimized for Raspberry Pi.
 - **Target**: Raspberry Pi 4 (8GB) / Pi 5 (ARM64).
 - **Features**: PostgreSQL + pgvector, S3 Storage, Search Engine, Redis.
 
-#### 4. [Raspberry Pi ARM Toolbox](./raspberry-pi)
+#### 6. [Raspberry Pi ARM Toolbox](./raspberry-pi)
 A set of optimized scripts specifically for Raspberry Pi or ARM-based devices.
 - **Target**: Raspberry Pi 4/5, ARM servers.
 - **Features**: Installs Docker, Docker Compose, Portainer.
@@ -68,22 +73,27 @@ Giải pháp triển khai AI Agents (OpenClaw) tích hợp với n8n và Model C
 - **Đối tượng**: VPS (Ubuntu 22.04+).
 - **Tính năng**: Cài đặt OpenClaw, n8n, MCP Server, Caddy, Postgres, Redis.
 
-#### 2. [LobeHub Mac Installer](./lobehub-mac)
+#### 2. [n8n Self-Hosted Installer](./n8n)
+Script thống nhất triển khai n8n bằng Docker Compose với nhiều tùy chọn mở rộng.
+- **Đối tượng**: macOS, Raspberry Pi, VPS (AMD64/ARM64).
+- **Tính năng**: Tùy chọn Worker, Queue Mode, PostgreSQL, Redis, FFmpeg, Puppeteer dependencies, Task Runners.
+
+#### 3. [LobeHub Mac Installer](./lobehub-mac)
 Script tối ưu cho Mac (M1/M2/M3/M4) sử dụng OrbStack hoặc Docker Desktop để cài đặt LobeHub v3.0+.
 - **Đối tượng**: Mac Mini, MacBook (Apple Silicon).
 - **Tính năng**: Tối ưu cho chip M, ParadeDB (PostgreSQL + pg_search + pgvector), Local S3 (RustFS/MinIO), SearXNG Search.
 
-#### 3. [AnyCrawl "Max Option" Stack](./anycrawl)
+#### 4. [AnyCrawl "Max Option" Stack](./anycrawl)
 Script triển khai AnyCrawl với PostgreSQL, MinIO, Redis và tích hợp MCP.
 - **Đối tượng**: Mac (M1/M2/M3/M4), Raspberry Pi (4/5), VPS.
 - **Tính năng**: PostgreSQL 17, MinIO S3, SearXNG, MCP Server (AI Interface).
 
-#### 4. [LobeHub Pi Installer](./lobehub-pi)
+#### 5. [LobeHub Pi Installer](./lobehub-pi)
 Script tự động cài đặt LobeHub v2.0+ (bản database) tối ưu cho Raspberry Pi.
 - **Đối tượng**: Raspberry Pi 4 (8GB) / Pi 5 (ARM64).
 - **Tính năng**: PostgreSQL + pgvector, S3 Storage, Search Engine, Redis.
 
-#### 4. [Raspberry Pi ARM Toolbox](./raspberry-pi)
+#### 6. [Raspberry Pi ARM Toolbox](./raspberry-pi)
 Tập hợp các script tối ưu riêng cho Raspberry Pi hoặc các thiết bị chạy ARM.
 - **Đối tượng**: Raspberry Pi 4/5, ARM servers.
 - **Tính năng**: Cài đặt Docker, Docker Compose, Portainer.
