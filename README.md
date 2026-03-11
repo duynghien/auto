@@ -50,6 +50,11 @@ Unified script for Grafana dashboards with pre-provisioned Prometheus integratio
 - **Target**: macOS, Raspberry Pi, VPS (AMD64/ARM64).
 - **Features**: Grafana server, Prometheus datasource provisioning, starter dashboard, helper commands.
 
+#### 9. [Supabase Self-Hosted Installer](./supabase)
+Unified script for Supabase via Docker Compose, aligned with the official self-hosting stack.
+- **Target**: macOS, Raspberry Pi (ARM64), VPS (AMD64/ARM64).
+- **Features**: Studio, Auth, PostgREST, Realtime, Storage + MinIO, Edge Functions, Analytics, Supavisor.
+
 ---
 
 ### 🛠️ General Usage
@@ -117,6 +122,11 @@ Script thống nhất triển khai Prometheus bằng Docker Compose với trải
 Script thống nhất triển khai Grafana với datasource Prometheus được provision sẵn.
 - **Đối tượng**: macOS, Raspberry Pi, VPS (AMD64/ARM64).
 - **Tính năng**: Grafana server, provisioning datasource Prometheus, dashboard khởi đầu, helper commands.
+
+#### 9. [Supabase Self-Hosted Installer](./supabase)
+Script thống nhất triển khai Supabase bằng Docker Compose, bám theo stack self-hosted chính thức.
+- **Đối tượng**: macOS, Raspberry Pi (ARM64), VPS (AMD64/ARM64).
+- **Tính năng**: Studio, Auth, PostgREST, Realtime, Storage + MinIO, Edge Functions, Analytics, Supavisor.
 
 ---
 
