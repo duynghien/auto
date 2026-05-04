@@ -126,7 +126,7 @@ cat << 'EOF'
              (____/      (_____|                    
 EOF
 echo ""
-echo -e "         Twenty CRM Setup v1.0 — $PLATFORM_LABEL"
+echo -e "         Twenty CRM Setup v2.0 — $PLATFORM_LABEL"
 echo "================================================================${NC}"
 echo ""
 
@@ -227,6 +227,71 @@ if [ ! -f .env.example ] && [ -f "$SCRIPT_DIR/.env.example" ]; then
 fi
 
 pok "Install dir: $INSTALL_DIR"
+
+# ========================================
+# Helper Script
+# ========================================
+HELPER_SCRIPT="$INSTALL_DIR/twenty.sh"
+cat > "$HELPER_SCRIPT" <<'HELPER'
+#!/bin/bash
+# Twenty CRM Helper Script v1.0
+
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+DOCKER_COMPOSE_CMD="docker compose"
+if command -v docker-compose &>/dev/null && ! docker compose version &>/dev/null; then
+    DOCKER_COMPOSE_CMD="docker-compose"
+fi
+
+CMD="${1:-}"
+case "$CMD" in
+  start)
+    $DOCKER_COMPOSE_CMD up -d
+    ;;
+  stop)
+    $DOCKER_COMPOSE_CMD stop
+    ;;
+  restart)
+    $DOCKER_COMPOSE_CMD restart
+    ;;
+  logs)
+    $DOCKER_COMPOSE_CMD logs -f "${2:-server}"
+    ;;
+  status)
+    $DOCKER_COMPOSE_CMD ps
+    ;;
+  update)
+    $DOCKER_COMPOSE_CMD pull
+    $DOCKER_COMPOSE_CMD up -d
+    ;;
+  health)
+    APP_PORT="$(grep -Eo '"[0-9]+:3000"' docker-compose.yml | head -n1 | sed -E 's/"([0-9]+):3000"/\1/' || true)"
+    APP_PORT="${APP_PORT:-3020}"
+    curl -sf "http://localhost:${APP_PORT}/healthz" >/dev/null && \
+      echo "Twenty CRM health: OK (http://localhost:${APP_PORT}/healthz)" || \
+      echo "Twenty CRM health: NOT READY"
+    ;;
+  *)
+    echo "Twenty CRM Helper v1.0"
+    echo ""
+    echo "Usage: ./twenty.sh {command}"
+    echo ""
+    echo "Commands:"
+    echo "  start     - Start all services"
+    echo "  stop      - Stop all services"
+    echo "  restart   - Restart all services"
+    echo "  logs      - View logs (default: server)"
+    echo "  status    - Show service status"
+    echo "  update    - Pull latest images & restart"
+    echo "  health    - Check /healthz endpoint"
+    exit 1
+    ;;
+esac
+HELPER
+chmod +x "$HELPER_SCRIPT"
+pok "Helper script created: $HELPER_SCRIPT"
 
 # ========================================
 # Step 3: Port & URL Configuration
@@ -391,9 +456,11 @@ echo "  • $MSG_SECRET_WARNING"
 echo "  • Path: $INSTALL_DIR/.env"
 echo ""
 echo -e "${CYAN}${MSG_MGMT}${NC}"
-echo "  • Start:   cd $INSTALL_DIR && $DOCKER_COMPOSE_CMD up -d"
-echo "  • Stop:    cd $INSTALL_DIR && $DOCKER_COMPOSE_CMD stop"
-echo "  • Logs:    cd $INSTALL_DIR && $DOCKER_COMPOSE_CMD logs -f server"
-echo "  • Upgrade: cd $INSTALL_DIR && $DOCKER_COMPOSE_CMD pull && $DOCKER_COMPOSE_CMD up -d"
+echo "  • Quick helper: cd $INSTALL_DIR && ./twenty.sh"
+echo "  • Start:        cd $INSTALL_DIR && ./twenty.sh start"
+echo "  • Stop:         cd $INSTALL_DIR && ./twenty.sh stop"
+echo "  • Logs:         cd $INSTALL_DIR && ./twenty.sh logs"
+echo "  • Status:       cd $INSTALL_DIR && ./twenty.sh status"
+echo "  • Upgrade:      cd $INSTALL_DIR && ./twenty.sh update"
 echo ""
 echo "$MSG_SUPPORT"
