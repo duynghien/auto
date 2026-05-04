@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# setup.sh - Twenty CRM Unified Setup v1.0
-# Supports: macOS (Apple Silicon / Intel), Raspberry Pi, VPS (amd64/arm64)
+# setup.sh - Twenty CRM Unified Setup v2.0
+# Supports: macOS, Linux (amd64/arm64)
 # Created by vnROM.net
 
 set -euo pipefail
@@ -73,9 +73,9 @@ if [[ "$lang_choice" == "2" ]]; then
     MSG_SWAP_OK="Swap đã được cấu hình"
     MSG_ENV_CREATED=".env đã tạo với mật khẩu ngẫu nhiên"
     MSG_ENV_EXISTS=".env đã tồn tại (giữ nguyên cấu hình cũ)"
-    MSG_PORT_PROMPT="  Nhập cổng web (mặc định: 3000): "
+    MSG_PORT_PROMPT="  Nhập cổng web public (mặc định theo docker-compose): "
     MSG_PORT_IN_USE="Cổng đã được sử dụng. Vui lòng chọn cổng khác."
-    MSG_SERVER_URL_PROMPT="  Nhập SERVER_URL (mặc định: http://localhost"
+    MSG_SERVER_URL_PROMPT="  Nhập SERVER_URL (mặc định: http://localhost:<port>)"
     MSG_STARTING="Đang khởi động containers..."
     MSG_WAITING="Đang đợi server khởi động"
     MSG_DONE="🎉 CÀI ĐẶT HOÀN TẤT!"
@@ -97,9 +97,9 @@ else
     MSG_COMPOSE_MISSING="Docker Compose Plugin not found!"
     MSG_ENV_CREATED=".env created with secure random credentials"
     MSG_ENV_EXISTS=".env already exists (keeping existing config)"
-    MSG_PORT_PROMPT="  Enter web port (default: 3000): "
+    MSG_PORT_PROMPT="  Enter public web port (default from docker-compose): "
     MSG_PORT_IN_USE="Port is already in use. Please choose another."
-    MSG_SERVER_URL_PROMPT="  Enter SERVER_URL (default: http://localhost"
+    MSG_SERVER_URL_PROMPT="  Enter SERVER_URL (default: http://localhost:<port>)"
     MSG_STARTING="Starting containers..."
     MSG_WAITING="Waiting for server to become healthy"
     MSG_DONE="🎉 INSTALLATION COMPLETE!"
@@ -193,6 +193,11 @@ for c in openssl curl; do
 done
 pok "Platform: $PLATFORM_LABEL"
 
+DOCKER_COMPOSE_CMD="docker compose"
+if command -v docker-compose &>/dev/null && ! docker compose version &>/dev/null; then
+    DOCKER_COMPOSE_CMD="docker-compose"
+fi
+
 # ========================================
 # Step 2: Install Directory
 # ========================================
@@ -212,15 +217,15 @@ if [[ "$SCRIPT_DIR" != "$INSTALL_DIR" ]]; then
 fi
 cd "$INSTALL_DIR"
 
-# Always download fresh docker-compose.yml (ensures clean port config)
-pwn "Downloading docker-compose.yml..."
-curl -fsSO https://raw.githubusercontent.com/twentyhq/twenty/main/packages/twenty-docker/docker-compose.yml
-pok "docker-compose.yml: downloaded"
-if [ ! -f .env.example ]; then
-    pwn "Downloading .env.example..."
-    curl -fsSO https://raw.githubusercontent.com/twentyhq/twenty/main/packages/twenty-docker/.env.example
-    pok ".env.example: downloaded"
+if [ ! -f docker-compose.yml ]; then
+    perr "Missing docker-compose.yml in $INSTALL_DIR"
+    exit 1
 fi
+
+if [ ! -f .env.example ] && [ -f "$SCRIPT_DIR/.env.example" ]; then
+    cp -n "$SCRIPT_DIR/.env.example" "$INSTALL_DIR/" 2>/dev/null || true
+fi
+
 pok "Install dir: $INSTALL_DIR"
 
 # ========================================
@@ -229,9 +234,15 @@ pok "Install dir: $INSTALL_DIR"
 echo ""
 echo -e "${CYAN}${MSG_STEP3}${NC}"
 
+# --- Detect default public port from compose ---
+DEFAULT_APP_PORT="$(grep -Eo '"[0-9]+:3000"' docker-compose.yml | head -n1 | sed -E 's/"([0-9]+):3000"/\1/' || true)"
+if ! [[ "$DEFAULT_APP_PORT" =~ ^[0-9]+$ ]]; then
+    DEFAULT_APP_PORT="3020"
+fi
+
 # --- Custom Port ---
 read -rp "$MSG_PORT_PROMPT" user_port
-APP_PORT="${user_port:-3000}"
+APP_PORT="${user_port:-$DEFAULT_APP_PORT}"
 
 # Validate it's a number
 if ! [[ "$APP_PORT" =~ ^[0-9]+$ ]]; then
@@ -254,7 +265,7 @@ pok "Port: $APP_PORT (available)"
 
 # --- SERVER_URL ---
 DEFAULT_SERVER_URL="http://localhost:${APP_PORT}"
-read -rp "${MSG_SERVER_URL_PROMPT}:${APP_PORT}): " user_server_url
+read -rp "${MSG_SERVER_URL_PROMPT} [${DEFAULT_SERVER_URL}]: " user_server_url
 SERVER_URL="${user_server_url:-$DEFAULT_SERVER_URL}"
 pok "SERVER_URL: $SERVER_URL"
 
@@ -269,6 +280,7 @@ TAG=latest
 
 PG_DATABASE_USER=postgres
 PG_DATABASE_PASSWORD=${PG_PASSWORD}
+PG_DATABASE_NAME=default
 PG_DATABASE_HOST=db
 PG_DATABASE_PORT=5432
 REDIS_URL=redis://redis:6379
@@ -293,12 +305,23 @@ else
     pok "$MSG_ENV_EXISTS"
 fi
 
-# Patch docker-compose.yml ports if not using default 3000
-if [[ "$APP_PORT" != "3000" ]]; then
+if grep -q '^SERVER_URL=' .env; then
     if [[ "$OS" == "Darwin" ]]; then
-        sed -i '' "s|\"3000:3000\"|\"${APP_PORT}:3000\"|g" docker-compose.yml
+        sed -i '' "s|^SERVER_URL=.*|SERVER_URL=${SERVER_URL}|" .env
     else
-        sed -i "s|\"3000:3000\"|\"${APP_PORT}:3000\"|g" docker-compose.yml
+        sed -i "s|^SERVER_URL=.*|SERVER_URL=${SERVER_URL}|" .env
+    fi
+else
+    echo "SERVER_URL=${SERVER_URL}" >> .env
+fi
+pok "SERVER_URL synced to .env"
+
+# Patch docker-compose.yml port mapping if needed
+if [[ "$APP_PORT" != "$DEFAULT_APP_PORT" ]]; then
+    if [[ "$OS" == "Darwin" ]]; then
+        sed -i '' -E "s|\"[0-9]+:3000\"|\"${APP_PORT}:3000\"|g" docker-compose.yml
+    else
+        sed -i -E "s|\"[0-9]+:3000\"|\"${APP_PORT}:3000\"|g" docker-compose.yml
     fi
     pok "Port mapping updated: $APP_PORT → 3000 (internal)"
 fi
@@ -309,9 +332,6 @@ fi
 echo ""
 echo -e "${CYAN}${MSG_STEP4}${NC}"
 pwn "$MSG_STARTING"
-
-DOCKER_COMPOSE_CMD="docker compose"
-command -v docker-compose &>/dev/null && ! docker compose version &>/dev/null && DOCKER_COMPOSE_CMD="docker-compose"
 
 $DOCKER_COMPOSE_CMD up -d
 
@@ -343,7 +363,15 @@ echo ""
 if [ "$SERVER_OK" = true ]; then
     pok "Twenty CRM server: OK"
 else
-    pwn "Twenty CRM: still starting (check: docker compose logs server)"
+    pwn "Twenty CRM: still starting (check: $DOCKER_COMPOSE_CMD logs -f server)"
+fi
+
+WEB_ACCESS_HINT="$SERVER_URL"
+if [[ "$SERVER_URL" == http://localhost:* ]] && [[ "$OS" == "Linux" ]]; then
+    LINUX_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+    if [ -n "$LINUX_IP" ]; then
+        WEB_ACCESS_HINT="http://${LINUX_IP}:${APP_PORT}"
+    fi
 fi
 
 echo ""
@@ -356,6 +384,7 @@ fi
 echo ""
 echo -e "  Platform:    ${CYAN}${PLATFORM_LABEL}${NC}"
 echo -e "  Twenty CRM:  ${PURPLE}${SERVER_URL}${NC}"
+echo -e "  LAN URL:     ${PURPLE}${WEB_ACCESS_HINT}${NC}"
 echo ""
 echo -e "${YELLOW}⚠️  ${MSG_IMPORTANT}${NC}"
 echo "  • $MSG_SECRET_WARNING"
