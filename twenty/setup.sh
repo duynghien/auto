@@ -331,7 +331,26 @@ pok "Port: $APP_PORT (available)"
 # --- SERVER_URL ---
 DEFAULT_SERVER_URL="http://localhost:${APP_PORT}"
 read -rp "${MSG_SERVER_URL_PROMPT} [${DEFAULT_SERVER_URL}]: " user_server_url
+
+# Trim spaces/newlines and apply default if empty
+user_server_url="$(printf '%s' "${user_server_url}" | tr -d '\r' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
 SERVER_URL="${user_server_url:-$DEFAULT_SERVER_URL}"
+
+# Auto-prepend scheme if user enters localhost:3020 or example.com
+if [[ ! "$SERVER_URL" =~ ^https?:// ]]; then
+    SERVER_URL="http://${SERVER_URL}"
+fi
+
+# Remove trailing slash for consistency
+SERVER_URL="${SERVER_URL%/}"
+
+# Validate format early to avoid container boot loop
+if ! [[ "$SERVER_URL" =~ ^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?$ ]]; then
+    perr "Invalid SERVER_URL: $SERVER_URL"
+    echo "  Expected format: http://localhost:${APP_PORT} or https://crm.example.com"
+    exit 1
+fi
+
 pok "SERVER_URL: $SERVER_URL"
 
 # --- Generate secrets ---

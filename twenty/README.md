@@ -42,10 +42,14 @@ What the setup script does:
 - Checks and installs Docker on Linux if needed
 - Creates install directory: `~/self-hosted/twenty`
 - Generates/updates `.env` with required values
-- Lets you choose public port and `SERVER_URL`
+- Lets you choose public port and `SERVER_URL` (auto-adds `http://` if missing)
 - Starts `server`, `worker`, `db`, `redis`
 - Verifies health endpoint
 - Creates helper script: `~/self-hosted/twenty/twenty.sh`
+
+`SERVER_URL` must be a valid URL origin, for example:
+- `http://localhost:3020`
+- `https://crm.example.com`
 
 ### 🔗 Access URLs
 
@@ -136,10 +140,14 @@ Script sẽ:
 - Kiểm tra và cài Docker trên Linux nếu thiếu
 - Tạo thư mục cài đặt: `~/self-hosted/twenty`
 - Tạo/cập nhật `.env` với thông số cần thiết
-- Cho chọn cổng public và `SERVER_URL`
+- Cho chọn cổng public và `SERVER_URL` (tự thêm `http://` nếu thiếu)
 - Khởi động `server`, `worker`, `db`, `redis`
 - Kiểm tra health endpoint
 - Tạo helper script: `~/self-hosted/twenty/twenty.sh`
+
+`SERVER_URL` phải là URL hợp lệ, ví dụ:
+- `http://localhost:3020`
+- `https://crm.example.com`
 
 ### 🔗 URL truy cập
 
