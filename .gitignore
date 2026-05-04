@@ -50,6 +50,7 @@ mcp_backups/
 .gemini/
 .cursorrules
 .aider*
+.windsurf/
 plans/
 CLAUDE.md
 AGENTS.md
