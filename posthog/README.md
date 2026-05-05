@@ -10,14 +10,14 @@ Automated script to deploy **PostHog hobby** with Docker Compose, aligned with t
 
 ### Supported Platforms
 
-- **macOS** (Apple Silicon / Intel)
+- **macOS** (Apple Silicon / Intel, **OrbStack-first**)
 - **Raspberry Pi** (ARM64)
 - **Linux VPS** (AMD64 / ARM64)
 
 ### What the script does
 
 1. Detects platform and checks system requirements
-2. Auto-installs Docker + Compose on Linux (if missing)
+2. Auto-installs Docker + Compose on Linux (if missing, distro-aware)
 3. Supports **bilingual UI** (English / Vietnamese)
 4. Supports access modes: localhost, LAN, domain (behind reverse proxy)
 5. Downloads/refreshes official [PostHog](https://github.com/PostHog/posthog) source snapshot
@@ -62,6 +62,8 @@ chmod +x setup.sh
 - `start` runs core services by default; use `start-full` for Temporal/Exceptions profiles
 - For production domain, place a reverse proxy (Caddy/Nginx/Traefik) in front
 - Slow/unstable registry network: tune retries via `POSTHOG_START_RETRIES` and `POSTHOG_PULL_PARALLEL_LIMIT`
+- On macOS, script auto-installs/starts OrbStack when Docker daemon is unavailable
+- On Linux, script supports `apt`, `dnf`, `yum`, `pacman`, and `zypper` for Compose/dependencies
 
 Support: <https://ai.vnrom.net>
 
@@ -73,14 +75,14 @@ Script tự động triển khai **PostHog hobby** bằng Docker Compose, đồn
 
 ### Nền tảng hỗ trợ
 
-- **macOS** (Apple Silicon / Intel)
+- **macOS** (Apple Silicon / Intel, **ưu tiên OrbStack**)
 - **Raspberry Pi** (ARM64)
 - **VPS Linux** (AMD64 / ARM64)
 
 ### Script sẽ làm gì
 
 1. Nhận diện nền tảng và kiểm tra tài nguyên
-2. Tự cài Docker + Compose trên Linux (nếu thiếu)
+2. Tự cài Docker + Compose trên Linux (nếu thiếu, có fallback theo distro)
 3. Hỗ trợ **song ngữ** (English / Tiếng Việt)
 4. Hỗ trợ mode truy cập: localhost, LAN, domain (qua reverse proxy)
 5. Tải/cập nhật source snapshot chính thức của [PostHog](https://github.com/PostHog/posthog)
@@ -125,5 +127,7 @@ chmod +x setup.sh
 - `start` mặc định chạy core services; dùng `start-full` để bật profile Temporal/Exceptions
 - Dùng domain production nên đặt reverse proxy (Caddy/Nginx/Traefik)
 - Nếu mạng kéo image chậm/không ổn định: chỉnh `POSTHOG_START_RETRIES` và `POSTHOG_PULL_PARALLEL_LIMIT`
+- Trên macOS, script sẽ tự cài/chạy OrbStack khi Docker daemon chưa sẵn sàng
+- Trên Linux, script hỗ trợ `apt`, `dnf`, `yum`, `pacman`, `zypper` để cài Compose/phụ thuộc
 
 Hỗ trợ: <https://ai.vnrom.net>
