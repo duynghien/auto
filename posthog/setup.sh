@@ -18,6 +18,79 @@ prepend_path_if_missing() {
     esac
 }
 
+apply_runtime_preflight_patch() {
+    if ! dc ps --status running --services 2>/dev/null | grep -qx "web"; then
+        pwn "$(say "Web container is not running yet, skip runtime Kafka preflight patch." "Container web chưa chạy, bỏ qua runtime Kafka preflight patch.")"
+        return 0
+    fi
+
+    if dc exec -T web python - <<'PYEOF'
+import re
+from pathlib import Path
+
+views_path = Path("/code/posthog/views.py")
+
+if not views_path.exists():
+    raise SystemExit("views.py not found in runtime container")
+
+views = views_path.read_text(encoding="utf-8")
+
+if "import socket\n" not in views:
+    views = views.replace("import os\n", "import os\nimport socket\n", 1)
+
+if "def _is_kafka_alive() -> bool:" not in views:
+    marker = "\n\n@never_cache\ndef preflight_check(request: HttpRequest) -> JsonResponse:\n"
+    kafka_fn = """
+def _is_kafka_alive() -> bool:
+    kafka_hosts = getattr(settings, "KAFKA_HOSTS", "")
+    if not kafka_hosts:
+        return False
+
+    entries = kafka_hosts.split(",") if isinstance(kafka_hosts, str) else kafka_hosts
+    for entry in entries:
+        host_port = str(entry).strip()
+        if not host_port:
+            continue
+        if ":" in host_port:
+            host, port_str = host_port.rsplit(":", 1)
+            try:
+                port = int(port_str)
+            except ValueError:
+                port = 9092
+        else:
+            host, port = host_port, 9092
+        try:
+            with socket.create_connection((host, port), timeout=2):
+                return True
+        except OSError:
+            continue
+    return False
+"""
+    if marker in views:
+        views = views.replace(marker, "\n\n" + kafka_fn + marker, 1)
+
+views = re.sub(
+    r'"kafka":\s*in_cloud\s*or\s*settings\.TEST,',
+    '"kafka": in_cloud or _traced("preflight.is_kafka_alive", _is_kafka_alive) or settings.TEST,',
+    views,
+    count=1,
+)
+
+views_path.write_text(views, encoding="utf-8")
+print("patched runtime preflight kafka check")
+PYEOF
+    then
+        pok "$(say "Patched runtime preflight Kafka check in web container." "Đã vá runtime preflight Kafka check trong container web.")"
+        if dc restart web >/dev/null 2>&1; then
+            pok "$(say "Restarted web container to apply runtime patch." "Đã restart container web để áp dụng runtime patch.")"
+        else
+            pwn "$(say "Could not restart web container after runtime patch." "Không thể restart container web sau khi vá runtime.")"
+        fi
+    else
+        pwn "$(say "Failed to patch runtime preflight Kafka check in web container." "Vá runtime preflight Kafka check trong container web thất bại.")"
+    fi
+}
+
 prepend_path_if_missing "/opt/homebrew/bin"
 prepend_path_if_missing "/usr/local/bin"
 prepend_path_if_missing "/opt/orbstack/bin"
@@ -145,6 +218,80 @@ sync_posthog_source_snapshot() {
     rm -f "$archive_file"
     rm -rf posthog
     mv "$tmp_dir" posthog
+}
+
+apply_posthog_preflight_patch() {
+    local views_file="posthog/posthog/views.py"
+    local utils_file="posthog/posthog/utils.py"
+
+    [[ -f "$views_file" && -f "$utils_file" ]] || return 0
+
+    python3 - "$views_file" "$utils_file" <<'PYEOF'
+import re
+import sys
+from pathlib import Path
+
+views_path = Path(sys.argv[1])
+utils_path = Path(sys.argv[2])
+
+views = views_path.read_text(encoding="utf-8")
+utils = utils_path.read_text(encoding="utf-8")
+
+if "is_kafka_alive" not in utils:
+    if "import socket\n" not in utils:
+        utils = utils.replace("import re\n", "import re\nimport socket\n", 1)
+
+    marker = "\n\ndef get_plugin_server_job_queues() -> Optional[list[str]]:\n"
+    kafka_fn = """
+def is_kafka_alive() -> bool:
+    kafka_hosts = getattr(settings, "KAFKA_HOSTS", "")
+    if not kafka_hosts:
+        return False
+
+    # KAFKA_HOSTS may be a string ("kafka:9092,kafka2:9092") or list/tuple.
+    if isinstance(kafka_hosts, str):
+        entries = kafka_hosts.split(",")
+    elif isinstance(kafka_hosts, (list, tuple)):
+        entries = kafka_hosts
+    else:
+        entries = [str(kafka_hosts)]
+
+    for entry in entries:
+        host_port = entry.strip()
+        if not host_port:
+            continue
+        if ":" in host_port:
+            host, port_str = host_port.rsplit(":", 1)
+            try:
+                port = int(port_str)
+            except ValueError:
+                port = 9092
+        else:
+            host, port = host_port, 9092
+        try:
+            with socket.create_connection((host, port), timeout=2):
+                return True
+        except OSError:
+            continue
+    return False
+
+"""
+    if marker in utils:
+        utils = utils.replace(marker, "\n\n" + kafka_fn + marker, 1)
+
+if "is_kafka_alive," not in views:
+    views = views.replace("    is_celery_alive,\n", "    is_celery_alive,\n    is_kafka_alive,\n", 1)
+
+views = re.sub(
+    r'"kafka":\s*in_cloud\s*or\s*settings\.TEST,',
+    '"kafka": in_cloud or _traced("preflight.is_kafka_alive", is_kafka_alive) or settings.TEST,',
+    views,
+    count=1,
+)
+
+views_path.write_text(views, encoding="utf-8")
+utils_path.write_text(utils, encoding="utf-8")
+PYEOF
 }
 
 prepare_test_source_stub() {
@@ -699,6 +846,9 @@ else
     fi
 fi
 
+apply_posthog_preflight_patch
+pok "$(say "Applied PostHog preflight patch (Kafka/Celery checks)." "Đã áp dụng patch preflight PostHog (check Kafka/Celery).")"
+
 read -rp "  $(say "PostHog image tag" "Tag image PostHog") [latest]: " POSTHOG_APP_TAG
 POSTHOG_APP_TAG=${POSTHOG_APP_TAG:-latest}
 read -rp "  $(say "PostHog Node image tag" "Tag image PostHog Node") [latest]: " POSTHOG_NODE_TAG
@@ -1002,6 +1152,7 @@ else
 
     [[ "$SUCCESS_START" == "true" ]] || perr "$(say "Failed to start PostHog stack." "Không thể khởi động stack PostHog.")"
     pok "$(say "Containers started." "Containers đã khởi động.")"
+    apply_runtime_preflight_patch
 fi
 
 # ========================================
@@ -1100,15 +1251,165 @@ refresh_source_snapshot() {
   mv "$tmp_dir" posthog
 }
 
+apply_posthog_preflight_patch() {
+  local views_file="posthog/posthog/views.py"
+  local utils_file="posthog/posthog/utils.py"
+  [[ -f "$views_file" && -f "$utils_file" ]] || return 0
+
+  python3 - "$views_file" "$utils_file" <<'PYEOF'
+import re
+import sys
+from pathlib import Path
+
+views_path = Path(sys.argv[1])
+utils_path = Path(sys.argv[2])
+
+views = views_path.read_text(encoding="utf-8")
+utils = utils_path.read_text(encoding="utf-8")
+
+if "is_kafka_alive" not in utils:
+    if "import socket\n" not in utils:
+        utils = utils.replace("import re\n", "import re\nimport socket\n", 1)
+
+    marker = "\n\ndef get_plugin_server_job_queues() -> Optional[list[str]]:\n"
+    kafka_fn = """
+def is_kafka_alive() -> bool:
+    kafka_hosts = getattr(settings, "KAFKA_HOSTS", "")
+    if not kafka_hosts:
+        return False
+
+    # KAFKA_HOSTS may be a string ("kafka:9092,kafka2:9092") or list/tuple.
+    if isinstance(kafka_hosts, str):
+        entries = kafka_hosts.split(",")
+    elif isinstance(kafka_hosts, (list, tuple)):
+        entries = kafka_hosts
+    else:
+        entries = [str(kafka_hosts)]
+
+    for entry in entries:
+        host_port = entry.strip()
+        if not host_port:
+            continue
+        if ":" in host_port:
+            host, port_str = host_port.rsplit(":", 1)
+            try:
+                port = int(port_str)
+            except ValueError:
+                port = 9092
+        else:
+            host, port = host_port, 9092
+        try:
+            with socket.create_connection((host, port), timeout=2):
+                return True
+        except OSError:
+            continue
+    return False
+
+"""
+    if marker in utils:
+        utils = utils.replace(marker, "\n\n" + kafka_fn + marker, 1)
+
+if "is_kafka_alive," not in views:
+    views = views.replace("    is_celery_alive,\n", "    is_celery_alive,\n    is_kafka_alive,\n", 1)
+
+views = re.sub(
+    r'"kafka":\s*in_cloud\s*or\s*settings\.TEST,',
+    '"kafka": in_cloud or _traced("preflight.is_kafka_alive", is_kafka_alive) or settings.TEST,',
+    views,
+    count=1,
+)
+
+views_path.write_text(views, encoding="utf-8")
+utils_path.write_text(utils, encoding="utf-8")
+PYEOF
+}
+
+apply_runtime_preflight_patch() {
+  if ! dc ps --status running --services 2>/dev/null | grep -qx "web"; then
+    echo "⚠️  Web container is not running yet, skip runtime Kafka preflight patch."
+    return 0
+  fi
+
+  if dc exec -T web python - <<'PYEOF'
+import re
+from pathlib import Path
+
+views_path = Path("/code/posthog/views.py")
+
+if not views_path.exists():
+    raise SystemExit("views.py not found in runtime container")
+
+views = views_path.read_text(encoding="utf-8")
+
+if "import socket\n" not in views:
+    views = views.replace("import os\n", "import os\nimport socket\n", 1)
+
+if "def _is_kafka_alive() -> bool:" not in views:
+    marker = "\n\n@never_cache\ndef preflight_check(request: HttpRequest) -> JsonResponse:\n"
+    kafka_fn = """
+def _is_kafka_alive() -> bool:
+    kafka_hosts = getattr(settings, "KAFKA_HOSTS", "")
+    if not kafka_hosts:
+        return False
+
+    entries = kafka_hosts.split(",") if isinstance(kafka_hosts, str) else kafka_hosts
+    for entry in entries:
+        host_port = str(entry).strip()
+        if not host_port:
+            continue
+        if ":" in host_port:
+            host, port_str = host_port.rsplit(":", 1)
+            try:
+                port = int(port_str)
+            except ValueError:
+                port = 9092
+        else:
+            host, port = host_port, 9092
+        try:
+            with socket.create_connection((host, port), timeout=2):
+                return True
+        except OSError:
+            continue
+    return False
+"""
+    if marker in views:
+        views = views.replace(marker, "\n\n" + kafka_fn + marker, 1)
+
+views = re.sub(
+    r'"kafka":\s*in_cloud\s*or\s*settings\.TEST,',
+    '"kafka": in_cloud or _traced("preflight.is_kafka_alive", _is_kafka_alive) or settings.TEST,',
+    views,
+    count=1,
+)
+
+views_path.write_text(views, encoding="utf-8")
+print("patched runtime preflight kafka check")
+PYEOF
+  then
+    echo "✅ Patched runtime preflight Kafka check in web container"
+    if dc restart web >/dev/null 2>&1; then
+      echo "✅ Restarted web container to apply runtime patch"
+    else
+      echo "⚠️  Could not restart web container after runtime patch"
+    fi
+  else
+    echo "⚠️  Failed to patch runtime preflight Kafka check in web container"
+  fi
+}
+
 case "${1:-}" in
   start)
     echo "🚀 Starting PostHog..."
+    apply_posthog_preflight_patch
     compose_up
+    apply_runtime_preflight_patch
     echo "✅ Started: $(app_url)"
     ;;
   start-full)
     echo "🚀 Starting PostHog with optional profiles (temporal + exceptions)..."
+    apply_posthog_preflight_patch
     COMPOSE_PARALLEL_LIMIT="${POSTHOG_PULL_PARALLEL_LIMIT:-4}" dc --profile temporal --profile exceptions up -d --pull always
+    apply_runtime_preflight_patch
     echo "✅ Full stack started: $(app_url)"
     ;;
   stop)
@@ -1118,7 +1419,9 @@ case "${1:-}" in
     ;;
   restart)
     echo "🔄 Restarting PostHog..."
+    apply_posthog_preflight_patch
     dc restart
+    apply_runtime_preflight_patch
     echo "✅ Restarted"
     ;;
   status)
@@ -1140,10 +1443,12 @@ case "${1:-}" in
     echo "⬆️  Upgrading PostHog source and containers..."
     if [[ -d posthog ]]; then
       refresh_source_snapshot || true
+      apply_posthog_preflight_patch
       cp -f posthog/docker-compose.base.yml docker-compose.base.yml
       cp -f posthog/docker-compose.hobby.yml docker-compose.yml
     fi
     compose_up
+    apply_runtime_preflight_patch
     echo "✅ Upgrade complete"
     ;;
   reset)
