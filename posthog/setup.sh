@@ -8,6 +8,21 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+prepend_path_if_missing() {
+    local dir="$1"
+    [[ -d "$dir" ]] || return 0
+
+    case ":$PATH:" in
+        *":$dir:"*) ;;
+        *) PATH="$dir:$PATH" ;;
+    esac
+}
+
+prepend_path_if_missing "/opt/homebrew/bin"
+prepend_path_if_missing "/usr/local/bin"
+prepend_path_if_missing "/opt/orbstack/bin"
+export PATH
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -96,6 +111,25 @@ read_env_value() {
     [[ -n "$line" ]] && echo "${line#*=}"
 }
 
+validate_posthog_source_runtime_assets() {
+    local required_files=(
+        "posthog/docker-compose.base.yml"
+        "posthog/docker-compose.hobby.yml"
+        "posthog/dev-services.env"
+        "posthog/docker/clickhouse/config.xml"
+    )
+    local missing=0
+
+    for file in "${required_files[@]}"; do
+        if [[ ! -f "$file" ]]; then
+            pwn "$(say "Missing source file: $file" "Thiếu file source: $file")"
+            missing=1
+        fi
+    done
+
+    [[ "$missing" -eq 0 ]]
+}
+
 sync_posthog_source_snapshot() {
     local ref="${POSTHOG_SOURCE_REF:-master}"
     local archive_url="https://codeload.github.com/PostHog/posthog/tar.gz/refs/heads/${ref}"
@@ -121,6 +155,9 @@ prepare_test_source_stub() {
     curl -fL --retry 2 --connect-timeout 15 --max-time 120 \
         https://raw.githubusercontent.com/PostHog/posthog/HEAD/docker-compose.hobby.yml \
         -o posthog/docker-compose.hobby.yml
+    curl -fL --retry 2 --connect-timeout 15 --max-time 120 \
+        https://raw.githubusercontent.com/PostHog/posthog/HEAD/dev-services.env \
+        -o posthog/dev-services.env
 }
 
 port_in_use() {
@@ -160,9 +197,134 @@ run_privileged() {
     fi
 }
 
+ensure_homebrew_on_macos() {
+    if command -v brew >/dev/null 2>&1; then
+        return 0
+    fi
+
+    pwn "$(say "Homebrew not found. Installing Homebrew..." "Không tìm thấy Homebrew. Đang cài Homebrew...")"
+    NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+    if [[ -x /opt/homebrew/bin/brew ]]; then
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+    elif [[ -x /usr/local/bin/brew ]]; then
+        eval "$(/usr/local/bin/brew shellenv)"
+    fi
+
+    command -v brew >/dev/null 2>&1 || return 1
+}
+
+wait_for_docker_daemon() {
+    local timeout_seconds="${1:-60}"
+    local waited=0
+
+    echo -n "  Waiting"
+    while [[ "$waited" -lt "$timeout_seconds" ]]; do
+        if docker info >/dev/null 2>&1; then
+            echo ""
+            return 0
+        fi
+        echo -n "."
+        sleep 2
+        waited=$((waited + 2))
+    done
+    echo ""
+    return 1
+}
+
+ensure_orbstack_on_macos() {
+    if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+        return 0
+    fi
+
+    if [[ ! -d "/Applications/OrbStack.app" ]]; then
+        ensure_homebrew_on_macos || return 1
+        pwn "$(say "OrbStack not found. Installing OrbStack..." "Không tìm thấy OrbStack. Đang cài OrbStack...")"
+        brew install --cask orbstack || return 1
+    fi
+
+    pwn "$(say "Starting OrbStack..." "Đang khởi động OrbStack...")"
+    open -a OrbStack 2>/dev/null || true
+
+    wait_for_docker_daemon "90" || return 1
+    docker compose version >/dev/null 2>&1 || return 1
+}
+
+ensure_macos_docker_stack() {
+    if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+        return 0
+    fi
+
+    if ensure_orbstack_on_macos; then
+        return 0
+    fi
+
+    ensure_homebrew_on_macos || return 1
+
+    if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
+        pwn "$(say "Installing Docker CLI + Compose plugin..." "Đang cài Docker CLI + Compose plugin...")"
+        brew install docker docker-compose || return 1
+    fi
+
+    if command -v colima >/dev/null 2>&1; then
+        if ! colima status >/dev/null 2>&1; then
+            pwn "$(say "OrbStack unavailable. Starting Colima runtime fallback..." "OrbStack chưa sẵn sàng. Đang chạy fallback Colima...")"
+            colima start --cpu "${POSTHOG_COLIMA_CPU:-4}" --memory "${POSTHOG_COLIMA_MEMORY:-8}" --disk "${POSTHOG_COLIMA_DISK:-60}"
+        fi
+    else
+        pwn "$(say "Installing Colima fallback..." "Đang cài Colima fallback...")"
+        brew install colima || return 1
+        colima start --cpu "${POSTHOG_COLIMA_CPU:-4}" --memory "${POSTHOG_COLIMA_MEMORY:-8}" --disk "${POSTHOG_COLIMA_DISK:-60}"
+    fi
+
+    docker info >/dev/null 2>&1
+}
+
+install_linux_compose_plugin() {
+    if docker compose version >/dev/null 2>&1; then
+        return 0
+    fi
+
+    if command -v apt-get >/dev/null 2>&1; then
+        run_privileged apt-get update -qq
+        run_privileged apt-get install -y -qq docker-compose-plugin
+    elif command -v dnf >/dev/null 2>&1; then
+        run_privileged dnf install -y docker-compose-plugin
+    elif command -v yum >/dev/null 2>&1; then
+        run_privileged yum install -y docker-compose-plugin
+    elif command -v pacman >/dev/null 2>&1; then
+        run_privileged pacman -Sy --noconfirm docker-compose
+    elif command -v zypper >/dev/null 2>&1; then
+        run_privileged zypper --non-interactive install docker-compose
+    else
+        return 1
+    fi
+
+    docker compose version >/dev/null 2>&1
+}
+
+install_linux_base_dependencies() {
+    if command -v apt-get >/dev/null 2>&1; then
+        run_privileged apt-get install -y -qq curl openssl python3 ca-certificates >/dev/null 2>&1 || true
+    elif command -v dnf >/dev/null 2>&1; then
+        run_privileged dnf install -y curl openssl python3 ca-certificates >/dev/null 2>&1 || true
+    elif command -v yum >/dev/null 2>&1; then
+        run_privileged yum install -y curl openssl python3 ca-certificates >/dev/null 2>&1 || true
+    elif command -v pacman >/dev/null 2>&1; then
+        run_privileged pacman -Sy --noconfirm curl openssl python ca-certificates >/dev/null 2>&1 || true
+    elif command -v zypper >/dev/null 2>&1; then
+        run_privileged zypper --non-interactive install curl openssl python3 ca-certificates >/dev/null 2>&1 || true
+    fi
+}
+
 DOCKER_CMD=(docker)
+DOCKER_HOME_OVERRIDE=""
 dc() {
-    "${DOCKER_CMD[@]}" compose "$@"
+    if [[ -n "${DOCKER_HOME_OVERRIDE:-}" ]]; then
+        HOME="$DOCKER_HOME_OVERRIDE" "${DOCKER_CMD[@]}" compose "$@"
+    else
+        "${DOCKER_CMD[@]}" compose "$@"
+    fi
 }
 
 refresh_docker_cmd() {
@@ -177,6 +339,58 @@ refresh_docker_cmd() {
     fi
 
     return 1
+}
+
+DOCKER_CONFIG_TMP=""
+DOCKER_HOME_TMP=""
+cleanup_temp_docker_config() {
+    if [[ -n "${DOCKER_CONFIG_TMP:-}" && -d "$DOCKER_CONFIG_TMP" ]]; then
+        rm -rf "$DOCKER_CONFIG_TMP"
+    fi
+    if [[ -n "${DOCKER_HOME_TMP:-}" && -d "$DOCKER_HOME_TMP" ]]; then
+        rm -rf "$DOCKER_HOME_TMP"
+    fi
+}
+trap cleanup_temp_docker_config EXIT
+
+prepare_headless_docker_config() {
+    local config_src="$HOME/.docker/config.json"
+    local config_dst=""
+
+    [[ "$PLATFORM" == "mac" ]] || return 0
+    [[ -f "$config_src" ]] || return 0
+    grep -q '"credsStore"' "$config_src" || grep -q '"credHelpers"' "$config_src" || return 0
+
+    DOCKER_HOME_TMP=$(mktemp -d)
+    mkdir -p "$DOCKER_HOME_TMP/.docker"
+    cp -R "$HOME/.docker/." "$DOCKER_HOME_TMP/.docker/" 2>/dev/null || true
+    config_dst="$DOCKER_HOME_TMP/.docker/config.json"
+
+    if ! python3 - "$config_src" "$config_dst" <<'PYEOF'
+import json
+import sys
+
+src, dst = sys.argv[1], sys.argv[2]
+with open(src, "r", encoding="utf-8") as f:
+    data = json.load(f)
+
+data.pop("credsStore", None)
+data.pop("credHelpers", None)
+
+with open(dst, "w", encoding="utf-8") as f:
+    json.dump(data, f, indent=2)
+PYEOF
+    then
+        rm -rf "$DOCKER_HOME_TMP"
+        DOCKER_HOME_TMP=""
+        DOCKER_CONFIG_TMP=""
+        return 0
+    fi
+
+    DOCKER_CONFIG_TMP="$DOCKER_HOME_TMP/.docker"
+    DOCKER_HOME_OVERRIDE="$DOCKER_HOME_TMP"
+    export DOCKER_CONFIG="$DOCKER_CONFIG_TMP"
+    pwn "$(say "Using temporary Docker config for headless session (disabled macOS keychain helper)." "Đang dùng Docker config tạm cho phiên headless (đã tắt macOS keychain helper).")"
 }
 
 # ========================================
@@ -251,23 +465,23 @@ echo ""
 echo -e "${BOLD}$(step_title 1)${NC}"
 
 if [[ "$PLATFORM" == "mac" ]]; then
-    if ! command -v docker >/dev/null 2>&1; then
-        perr "$(say "Docker is not installed. Install OrbStack or Docker Desktop first." "Docker chưa được cài. Hãy cài OrbStack hoặc Docker Desktop trước.")"
-    fi
+    if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
+        pwn "$(say "Docker daemon is not ready. Trying automatic setup for macOS..." "Docker daemon chưa sẵn sàng. Đang thử thiết lập tự động cho macOS...")"
+        if ! ensure_macos_docker_stack; then
+            pwn "$(say "Fallback: trying OrbStack/Docker Desktop app startup..." "Fallback: đang thử khởi động app OrbStack/Docker Desktop...")"
+            open -a OrbStack 2>/dev/null || open -a Docker 2>/dev/null || true
+            echo -n "  Waiting"
+            for _ in {1..30}; do
+                if docker info >/dev/null 2>&1; then
+                    break
+                fi
+                echo -n "."
+                sleep 2
+            done
+            echo ""
+        fi
 
-    if ! docker info >/dev/null 2>&1; then
-        pwn "$(say "Docker daemon is not running. Trying to start Docker..." "Docker daemon chưa chạy. Đang thử khởi động Docker...")"
-        open -a OrbStack 2>/dev/null || open -a Docker 2>/dev/null || true
-        echo -n "  Waiting"
-        for _ in {1..30}; do
-            if docker info >/dev/null 2>&1; then
-                break
-            fi
-            echo -n "."
-            sleep 2
-        done
-        echo ""
-        docker info >/dev/null 2>&1 || perr "$(say "Docker daemon is still not available." "Docker daemon vẫn chưa sẵn sàng.")"
+        docker info >/dev/null 2>&1 || perr "$(say "Docker daemon is still not available. Please install/start Docker Desktop, OrbStack, or Colima manually." "Docker daemon vẫn chưa sẵn sàng. Hãy cài/chạy Docker Desktop, OrbStack hoặc Colima thủ công.")"
     fi
 
     if ! docker compose version >/dev/null 2>&1; then
@@ -285,13 +499,11 @@ else
         fi
     fi
 
-    if ! docker compose version >/dev/null 2>&1; then
-        pwn "$(say "Docker Compose plugin missing, installing..." "Thiếu Docker Compose plugin, đang cài...")"
-        run_privileged apt-get update -qq
-        run_privileged apt-get install -y -qq docker-compose-plugin
+    if ! install_linux_compose_plugin; then
+        perr "$(say "Docker Compose plugin missing and auto-install failed. Install Docker Compose plugin manually, then rerun." "Thiếu Docker Compose plugin và tự cài thất bại. Hãy cài Docker Compose plugin thủ công rồi chạy lại.")"
     fi
 
-    run_privileged apt-get install -y -qq curl openssl python3 ca-certificates >/dev/null 2>&1 || true
+    install_linux_base_dependencies
 fi
 
 for cmd in curl openssl python3; do
@@ -299,6 +511,8 @@ for cmd in curl openssl python3; do
         perr "$(say "Missing required command:" "Thiếu command bắt buộc:") $cmd"
     fi
 done
+
+prepare_headless_docker_config
 
 refresh_docker_cmd || perr "$(say "Docker daemon is not accessible." "Không thể truy cập Docker daemon.")"
 dc version >/dev/null 2>&1 || perr "$(say "Docker Compose command is not ready." "Docker Compose chưa sẵn sàng.")"
@@ -455,13 +669,15 @@ if [[ "$SKIP_SOURCE_SYNC" == "1" ]]; then
         fi
     fi
 
-    if [[ ! -f posthog/docker-compose.base.yml || ! -f posthog/docker-compose.hobby.yml ]]; then
-        if [[ "$TEST_MODE" == "1" ]]; then
+    if [[ "$TEST_MODE" == "1" ]]; then
+        if [[ ! -f posthog/docker-compose.base.yml || ! -f posthog/docker-compose.hobby.yml || ! -f posthog/dev-services.env ]]; then
             pwn "$(say "Source exists but compose files are missing. Rebuilding test stub..." "Source có sẵn nhưng thiếu compose files. Đang dựng lại test stub...")"
             prepare_test_source_stub
             pok "$(say "Compose stub files restored." "Đã khôi phục compose stub files.")"
-        else
-            perr "$(say "Source folder is incomplete. Disable skip mode or re-sync source." "Source chưa đầy đủ. Hãy tắt skip mode hoặc đồng bộ source lại.")"
+        fi
+    else
+        if ! validate_posthog_source_runtime_assets; then
+            perr "$(say "Source folder is incomplete for runtime. Disable skip mode or re-sync source." "Source chưa đủ file runtime. Hãy tắt skip mode hoặc đồng bộ source lại.")"
         fi
     fi
 
@@ -542,6 +758,17 @@ mkdir -p compose share
 
 cp -f posthog/docker-compose.base.yml docker-compose.base.yml
 cp -f posthog/docker-compose.hobby.yml docker-compose.yml
+if [[ -f posthog/dev-services.env ]]; then
+    cp -f posthog/dev-services.env dev-services.env
+else
+    pwn "$(say "Missing posthog/dev-services.env. Compose validation may fail until source is refreshed." "Thiếu posthog/dev-services.env. Compose có thể lỗi cho tới khi source được đồng bộ lại.")"
+fi
+
+if [[ -f posthog/docker/livestream/configs-hobby.yml ]]; then
+    cp -f posthog/docker/livestream/configs-hobby.yml posthog/docker/livestream/configs.yml
+else
+    pwn "$(say "Missing livestream config template: posthog/docker/livestream/configs-hobby.yml" "Thiếu template livestream config: posthog/docker/livestream/configs-hobby.yml")"
+fi
 
 cat > docker-compose.override.yml <<'OVEREOF'
 services:
@@ -551,6 +778,10 @@ services:
     environment:
       CADDY_TLS_BLOCK: "${CADDY_TLS_BLOCK}"
       CADDY_HOST: "${CADDY_HOST}"
+
+  livestream:
+    volumes:
+      - ./posthog/docker/livestream:/configs
 
   worker:
     environment:
@@ -567,6 +798,12 @@ services:
     environment:
       SITE_URL: "${SITE_URL}"
       OBJECT_STORAGE_PUBLIC_ENDPOINT: "${OBJECT_STORAGE_PUBLIC_ENDPOINT}"
+      LOGS_REDIS_HOST: "redis7"
+      LOGS_REDIS_PORT: "6379"
+      LOGS_REDIS_TLS: "false"
+      TRACES_REDIS_HOST: "redis7"
+      TRACES_REDIS_PORT: "6379"
+      TRACES_REDIS_TLS: "false"
 
   asyncmigrationscheck:
     environment:
@@ -679,7 +916,7 @@ else
     SUCCESS_START=false
     for attempt in $(seq 1 "$MAX_START_ATTEMPTS"); do
         pwn "$(say "Starting stack (attempt $attempt/$MAX_START_ATTEMPTS, parallel limit=$PULL_PARALLEL_LIMIT)..." "Đang khởi động stack (lần $attempt/$MAX_START_ATTEMPTS, giới hạn pull song song=$PULL_PARALLEL_LIMIT)...")"
-        if COMPOSE_PARALLEL_LIMIT="$PULL_PARALLEL_LIMIT" dc up -d --pull always --build; then
+        if COMPOSE_PARALLEL_LIMIT="$PULL_PARALLEL_LIMIT" dc up -d --pull always; then
             SUCCESS_START=true
             break
         fi
@@ -766,7 +1003,7 @@ http_port() {
 
 compose_up() {
   local parallel="${POSTHOG_PULL_PARALLEL_LIMIT:-4}"
-  COMPOSE_PARALLEL_LIMIT="$parallel" dc up -d --pull always --build
+  COMPOSE_PARALLEL_LIMIT="$parallel" dc up -d --pull always
 }
 
 refresh_source_snapshot() {
@@ -794,7 +1031,7 @@ case "${1:-}" in
     ;;
   start-full)
     echo "🚀 Starting PostHog with optional profiles (temporal + exceptions)..."
-    COMPOSE_PARALLEL_LIMIT="${POSTHOG_PULL_PARALLEL_LIMIT:-4}" dc --profile temporal --profile exceptions up -d --pull always --build
+    COMPOSE_PARALLEL_LIMIT="${POSTHOG_PULL_PARALLEL_LIMIT:-4}" dc --profile temporal --profile exceptions up -d --pull always
     echo "✅ Full stack started: $(app_url)"
     ;;
   stop)
