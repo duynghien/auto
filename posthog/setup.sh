@@ -606,6 +606,7 @@ fi
 NETWORK_MODE="localhost"
 APP_URL="http://localhost:${APP_PORT}"
 ACCESS_HOST="localhost"
+TUNNEL_NETWORK=""
 
 case "$NET_CHOICE" in
     2)
@@ -626,6 +627,10 @@ case "$NET_CHOICE" in
         APP_URL=$(normalize_url "$DOMAIN_INPUT")
         [[ -z "$APP_URL" ]] && perr "$(say "Domain/URL is required." "Bắt buộc nhập domain/URL.")"
         ACCESS_HOST=$(host_from_url "$APP_URL")
+        read -rp "  $(say "Docker network for Cloudflare Tunnel container" "Docker network cho container Cloudflare Tunnel") [public_network]: " TUNNEL_NETWORK
+        TUNNEL_NETWORK=${TUNNEL_NETWORK:-public_network}
+        [[ -z "$TUNNEL_NETWORK" ]] && perr "$(say "Tunnel network is required." "Bắt buộc nhập network tunnel.")"
+        [[ "$TUNNEL_NETWORK" =~ ^[a-zA-Z0-9_.-]+$ ]] || perr "$(say "Invalid tunnel network name." "Tên network tunnel không hợp lệ.")"
         ;;
     *)
         NETWORK_MODE="localhost"
@@ -770,6 +775,77 @@ else
     pwn "$(say "Missing livestream config template: posthog/docker/livestream/configs-hobby.yml" "Thiếu template livestream config: posthog/docker/livestream/configs-hobby.yml")"
 fi
 
+if [[ "$NETWORK_MODE" == "domain" ]]; then
+cat > docker-compose.override.yml <<OVEREOF
+services:
+  proxy:
+    networks:
+      - default
+      - ${TUNNEL_NETWORK}
+    ports:
+      - "\${POSTHOG_HTTP_PORT}:80"
+    environment:
+      CADDY_TLS_BLOCK: "\${CADDY_TLS_BLOCK}"
+      CADDY_HOST: "\${CADDY_HOST}"
+
+  livestream:
+    volumes:
+      - ./posthog/docker/livestream:/configs
+
+  worker:
+    environment:
+      SITE_URL: "\${SITE_URL}"
+      OBJECT_STORAGE_PUBLIC_ENDPOINT: "\${OBJECT_STORAGE_PUBLIC_ENDPOINT}"
+
+  web:
+    environment:
+      SITE_URL: "\${SITE_URL}"
+      LIVESTREAM_HOST: "\${LIVESTREAM_URL}"
+      OBJECT_STORAGE_PUBLIC_ENDPOINT: "\${OBJECT_STORAGE_PUBLIC_ENDPOINT}"
+
+  plugins:
+    environment:
+      SITE_URL: "\${SITE_URL}"
+      OBJECT_STORAGE_PUBLIC_ENDPOINT: "\${OBJECT_STORAGE_PUBLIC_ENDPOINT}"
+      LOGS_REDIS_HOST: "redis7"
+      LOGS_REDIS_PORT: "6379"
+      LOGS_REDIS_TLS: "false"
+      TRACES_REDIS_HOST: "redis7"
+      TRACES_REDIS_PORT: "6379"
+      TRACES_REDIS_TLS: "false"
+
+  asyncmigrationscheck:
+    environment:
+      SITE_URL: "\${SITE_URL}"
+
+  temporal-django-worker:
+    profiles: ["temporal"]
+    environment:
+      SITE_URL: "\${SITE_URL}"
+
+  temporal:
+    profiles: ["temporal"]
+
+  temporal-ui:
+    profiles: ["temporal"]
+
+  temporal-admin-tools:
+    profiles: ["temporal"]
+
+  elasticsearch:
+    profiles: ["temporal"]
+
+  cymbal:
+    profiles: ["exceptions"]
+
+  cyclotron-janitor:
+    profiles: ["exceptions"]
+
+networks:
+  ${TUNNEL_NETWORK}:
+    external: true
+OVEREOF
+else
 cat > docker-compose.override.yml <<'OVEREOF'
 services:
   proxy:
@@ -832,6 +908,7 @@ services:
   cyclotron-janitor:
     profiles: ["exceptions"]
 OVEREOF
+fi
 
 cat > compose/start <<'SCRIPTEOF'
 #!/bin/bash
