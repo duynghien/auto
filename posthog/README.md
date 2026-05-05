@@ -64,6 +64,7 @@ chmod +x setup.sh
 - Slow/unstable registry network: tune retries via `POSTHOG_START_RETRIES` and `POSTHOG_PULL_PARALLEL_LIMIT`
 - On macOS, script auto-installs/starts OrbStack when Docker daemon is unavailable
 - On Linux, script supports `apt`, `dnf`, `yum`, `pacman`, and `zypper` for Compose/dependencies
+- In `Domain` mode, script asks for your Cloudflare Tunnel Docker network (default: `public_network`) and auto-attaches `proxy` to that external network
 
 Support: <https://ai.vnrom.net>
 
@@ -129,5 +130,6 @@ chmod +x setup.sh
 - Nếu mạng kéo image chậm/không ổn định: chỉnh `POSTHOG_START_RETRIES` và `POSTHOG_PULL_PARALLEL_LIMIT`
 - Trên macOS, script sẽ tự cài/chạy OrbStack khi Docker daemon chưa sẵn sàng
 - Trên Linux, script hỗ trợ `apt`, `dnf`, `yum`, `pacman`, `zypper` để cài Compose/phụ thuộc
+- Ở mode `Domain`, script sẽ hỏi tên Docker network của Cloudflare Tunnel (mặc định: `public_network`) và tự nối service `proxy` vào external network đó
 
 Hỗ trợ: <https://ai.vnrom.net>
