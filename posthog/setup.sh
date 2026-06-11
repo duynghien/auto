@@ -188,7 +188,7 @@ validate_posthog_source_runtime_assets() {
     local required_files=(
         "posthog/docker-compose.base.yml"
         "posthog/docker-compose.hobby.yml"
-        "posthog/dev-services.env"
+        "posthog/.env.services"
         "posthog/docker/clickhouse/config.xml"
     )
     local missing=0
@@ -303,8 +303,8 @@ prepare_test_source_stub() {
         https://raw.githubusercontent.com/PostHog/posthog/HEAD/docker-compose.hobby.yml \
         -o posthog/docker-compose.hobby.yml
     curl -fL --retry 2 --connect-timeout 15 --max-time 120 \
-        https://raw.githubusercontent.com/PostHog/posthog/HEAD/dev-services.env \
-        -o posthog/dev-services.env
+        https://raw.githubusercontent.com/PostHog/posthog/HEAD/.env.services \
+        -o posthog/.env.services
 }
 
 port_in_use() {
@@ -822,7 +822,7 @@ if [[ "$SKIP_SOURCE_SYNC" == "1" ]]; then
     fi
 
     if [[ "$TEST_MODE" == "1" ]]; then
-        if [[ ! -f posthog/docker-compose.base.yml || ! -f posthog/docker-compose.hobby.yml || ! -f posthog/dev-services.env ]]; then
+        if [[ ! -f posthog/docker-compose.base.yml || ! -f posthog/docker-compose.hobby.yml || ! -f posthog/.env.services ]]; then
             pwn "$(say "Source exists but compose files are missing. Rebuilding test stub..." "Source có sẵn nhưng thiếu compose files. Đang dựng lại test stub...")"
             prepare_test_source_stub
             pok "$(say "Compose stub files restored." "Đã khôi phục compose stub files.")"
@@ -913,10 +913,10 @@ mkdir -p compose share
 
 cp -f posthog/docker-compose.base.yml docker-compose.base.yml
 cp -f posthog/docker-compose.hobby.yml docker-compose.yml
-if [[ -f posthog/dev-services.env ]]; then
-    cp -f posthog/dev-services.env dev-services.env
+if [[ -f posthog/.env.services ]]; then
+    cp -f posthog/.env.services .env.services
 else
-    pwn "$(say "Missing posthog/dev-services.env. Compose validation may fail until source is refreshed." "Thiếu posthog/dev-services.env. Compose có thể lỗi cho tới khi source được đồng bộ lại.")"
+    pwn "$(say "Missing posthog/.env.services. Compose validation may fail until source is refreshed." "Thiếu posthog/.env.services. Compose có thể lỗi cho tới khi source được đồng bộ lại.")"
 fi
 
 if [[ -f posthog/docker/livestream/configs-hobby.yml ]]; then
