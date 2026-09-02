@@ -25,6 +25,7 @@ Automated script to deploy **PostHog hobby** with Docker Compose, aligned with t
 7. Uses official `docker-compose.hobby.yml` + override for portable networking
 8. Starts services and checks health
 9. Creates helper script `hog.sh`
+10. Applies a preflight patch so **Queue · Kafka** and **Background jobs · Celery** checks reflect runtime health on self-hosted installs
 
 ### Quick Install
 
@@ -65,6 +66,9 @@ chmod +x setup.sh
 - On macOS, script auto-installs/starts OrbStack when Docker daemon is unavailable
 - On Linux, script supports `apt`, `dnf`, `yum`, `pacman`, and `zypper` for Compose/dependencies
 - In `Domain` mode, script asks for your Cloudflare Tunnel Docker network (default: `public_network`) and auto-attaches `proxy` to that external network
+- Script auto-patches PostHog preflight checks (`views.py` + `utils.py`) during install and `./hog.sh upgrade`
+- Installer keeps startup production-safe: `compose/start` always runs `./bin/migrate` before `./bin/docker-server`
+- Kafka preflight patch supports both `KAFKA_HOSTS` string and list/tuple formats
 
 Support: <https://ai.vnrom.net>
 
@@ -91,6 +95,7 @@ Script tự động triển khai **PostHog hobby** bằng Docker Compose, đồn
 7. Dùng `docker-compose.hobby.yml` chính thức + file override để chạy linh hoạt
 8. Khởi động services và kiểm tra health
 9. Tạo script quản lý `hog.sh`
+10. Tự vá preflight để check **Queue · Kafka** và **Background jobs · Celery** phản ánh đúng trạng thái runtime trên self-hosted
 
 ### Cài nhanh
 
@@ -131,5 +136,8 @@ chmod +x setup.sh
 - Trên macOS, script sẽ tự cài/chạy OrbStack khi Docker daemon chưa sẵn sàng
 - Trên Linux, script hỗ trợ `apt`, `dnf`, `yum`, `pacman`, `zypper` để cài Compose/phụ thuộc
 - Ở mode `Domain`, script sẽ hỏi tên Docker network của Cloudflare Tunnel (mặc định: `public_network`) và tự nối service `proxy` vào external network đó
+- Script tự vá preflight (`views.py` + `utils.py`) khi cài đặt và khi chạy `./hog.sh upgrade`
+- Trình cài đặt giữ startup theo hướng production-safe: `compose/start` luôn chạy `./bin/migrate` trước `./bin/docker-server`
+- Patch Kafka preflight hỗ trợ cả `KAFKA_HOSTS` dạng chuỗi và dạng list/tuple
 
 Hỗ trợ: <https://ai.vnrom.net>
