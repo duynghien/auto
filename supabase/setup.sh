@@ -8,6 +8,17 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+on_error() {
+  local exit_code=$?
+  local line_no=${1:-unknown}
+  echo -e "\n\033[0;31m✖ [ERROR] Command failed at line ${line_no} (exit code: ${exit_code}).\033[0m" >&2
+  if [[ -f "docker-compose.yml" ]]; then
+    echo -e "  \033[1;33m→ Check container logs:\033[0m docker compose logs --tail=50" >&2
+  fi
+  exit "$exit_code"
+}
+trap 'on_error $LINENO' ERR
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -413,6 +424,17 @@ create_helper_script() {
 set -euo pipefail
 IFS=$'\n\t'
 
+on_error() {
+  local exit_code=$?
+  local line_no=${1:-unknown}
+  echo -e "\n\033[0;31m✖ [ERROR] Command failed at line ${line_no} (exit code: ${exit_code}).\033[0m" >&2
+  if [[ -f "docker-compose.yml" ]]; then
+    echo -e "  \033[1;33m→ Check container logs:\033[0m docker compose logs --tail=50" >&2
+  fi
+  exit "$exit_code"
+}
+trap 'on_error $LINENO' ERR
+
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
@@ -566,9 +588,90 @@ case "${1:-status}" in
     check_http_code "REST gateway" "http://localhost:${HTTP_PORT}/rest/v1/" "200,404" -H "apikey: ${ANON_KEY}" -H "Authorization: Bearer ${ANON_KEY}"
     check_http_body "Edge Functions hello" "http://localhost:${HTTP_PORT}/functions/v1/hello" "Hello from Edge Functions" -H "apikey: ${ANON_KEY}" -H "Authorization: Bearer ${ANON_KEY}"
     ;;
-  upgrade)
+  upgrade|update)
     dc pull
     dc up -d
+    ;;
+  backup)
+    BACKUP_DIR="./backups"
+    mkdir -p -m 700 "$BACKUP_DIR"
+    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+    ARCHIVE="$BACKUP_DIR/supabase-db-$TIMESTAMP.sql.gz"
+    echo "📦 Backing up Supabase database (service: db) to $ARCHIVE..."
+    if dc ps --services --filter "status=running" 2>/dev/null | grep -qx "db"; then
+      dc exec -T db pg_dump -U "postgres" "postgres" | gzip > "$ARCHIVE"
+      chmod 600 "$ARCHIVE"
+      echo "✅ Database backup complete: $ARCHIVE"
+    else
+      echo "❌ Database service 'db' is not running. Run './supa.sh start' first."
+      exit 1
+    fi
+    cp .env "$BACKUP_DIR/.env-$TIMESTAMP" 2>/dev/null || true
+    chmod 600 "$BACKUP_DIR/.env-$TIMESTAMP" 2>/dev/null || true
+    ;;
+  restore)
+    RESTORE_FILE="${2:-}"
+    if [[ -z "$RESTORE_FILE" || ! -f "$RESTORE_FILE" ]]; then
+      echo "❌ Usage: ./supa.sh restore <backup-file.sql.gz>"
+      exit 1
+    fi
+    if ! gzip -t "$RESTORE_FILE" 2>/dev/null; then
+      echo "❌ Backup file is not a valid gzip file: $RESTORE_FILE"
+      exit 1
+    fi
+    if ! dc ps --services --filter "status=running" 2>/dev/null | grep -qx "db"; then
+      echo "❌ Database service 'db' is not running. Run './supa.sh start' first."
+      exit 1
+    fi
+    echo "⚠️  Restoring database from $RESTORE_FILE will overwrite current Supabase data!"
+    read -r -p "Are you sure? (y/N): " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+      echo "Restore cancelled."
+      exit 0
+    fi
+    mkdir -p -m 700 "./backups"
+    PRE_BACKUP="./backups/pre-restore-$(date +%Y%m%d_%H%M%S).sql.gz"
+    echo "📦 Creating safety pre-restore backup at $PRE_BACKUP..."
+    dc exec -T db pg_dump -U "postgres" "postgres" 2>/dev/null | gzip > "$PRE_BACKUP" || true
+    chmod 600 "$PRE_BACKUP" 2>/dev/null || true
+    echo "🛑 Stopping API services during restore..."
+    dc stop rest auth realtime storage functions 2>/dev/null || true
+    echo "📥 Importing database..."
+    gzip -dc "$RESTORE_FILE" | dc exec -T db psql -U "postgres" -d "postgres"
+    echo "🚀 Restarting services..."
+    dc start rest auth realtime storage functions 2>/dev/null || true
+    echo "✅ Database restored successfully!"
+    ;;
+  doctor)
+    echo "🩺 Running Supabase Diagnostics..."
+    echo "----------------------------------------"
+    echo "1. Container Status:"
+    dc ps
+    echo ""
+    echo "2. Port Listeners:"
+    [[ -n "$HTTP_PORT" ]] || HTTP_PORT="8000"
+    if command -v lsof >/dev/null 2>&1; then
+      lsof -iTCP:"$HTTP_PORT" -sTCP:LISTEN -n -P || echo "Port $HTTP_PORT not listening"
+    fi
+    echo ""
+    echo "3. Health Checks:"
+    check_service kong || true
+    check_service studio || true
+    check_service auth || true
+    check_service rest || true
+    check_service db || true
+    echo ""
+    echo "4. Database Readiness:"
+    if dc exec -T db pg_isready -U "postgres" 2>/dev/null; then
+      echo "✅ PostgreSQL (db) is ready"
+    else
+      echo "❌ PostgreSQL is not ready"
+    fi
+    echo ""
+    echo "5. Disk Space:"
+    df -h . | awk 'NR==1 || NR==2'
+    echo ""
+    echo "Doctor check finished."
     ;;
   env)
     cat .env
@@ -579,6 +682,34 @@ case "${1:-status}" in
     echo "Anon key       : $(read_env_value "ANON_KEY" ".env")"
     echo "Service role   : $(read_env_value "SERVICE_ROLE_KEY" ".env")"
     ;;
+  uninstall)
+    echo "⚠️  Uninstall Supabase"
+    echo "Choose uninstall mode:"
+    echo "  1) Stop and remove containers and networks (KEEP data volumes)"
+    echo "  2) FULL PURGE: Remove containers, networks, data volumes, and installation files"
+    echo "  3) Cancel"
+    read -r -p "Select [1-3]: " uopt
+    case "$uopt" in
+      1)
+        dc down
+        echo "✅ Containers removed. Data preserved in volumes."
+        ;;
+      2)
+        read -r -p "Are you ABSOLUTELY sure? All schemas, users, and tables will be DELETED forever! (type 'yes'): " uconfirm
+        if [[ "$uconfirm" == "yes" ]]; then
+          dc down -v --remove-orphans
+          cd ..
+          rm -rf "$(basename "$PWD")"
+          echo "✅ Full purge complete. Directory removed."
+        else
+          echo "Uninstall cancelled."
+        fi
+        ;;
+      *)
+        echo "Cancelled."
+        ;;
+    esac
+    ;;
   reset)
     echo "This will remove Supabase containers and volumes."
     read -rp "Type 'yes' to continue: " confirm
@@ -586,13 +717,18 @@ case "${1:-status}" in
     dc down -v --remove-orphans
     ;;
   *)
-    echo "Usage: $0 {start|stop|restart|status|logs [service]|health|upgrade|env|keys|reset}"
+    echo "Usage: $0 {start|stop|restart|status|logs [service]|health|backup|restore <file>|doctor|upgrade|env|keys|uninstall|reset}"
     exit 1
     ;;
 esac
 SCRIPTEOF
 
     chmod +x supa.sh
+    ln -sf supa.sh supabase.sh
+    if command -v sudo >/dev/null 2>&1; then
+        sudo ln -sf "$PWD/supa.sh" /usr/local/bin/supa 2>/dev/null || true
+        sudo ln -sf "$PWD/supa.sh" /usr/local/bin/supabase 2>/dev/null || true
+    fi
 }
 
 # ========================================
@@ -664,7 +800,17 @@ if [[ "$TEST_MODE" == "1" ]]; then
     pwn "$(say "TEST MODE enabled: skip docker compose up and health verification." "TEST MODE đã bật: bỏ qua docker compose up và kiểm tra health.")"
 fi
 
-INSTALL_DIR="$HOME/self-hosted/supabase"
+TARGET_USER="${SUDO_USER:-$USER}"
+TARGET_GROUP=$(id -gn "$TARGET_USER" 2>/dev/null || echo "$TARGET_USER")
+if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
+    USER_HOME=$(getent passwd "$SUDO_USER" 2>/dev/null | cut -d: -f6)
+    [ -z "$USER_HOME" ] && USER_HOME="/home/$SUDO_USER"
+else
+    USER_HOME="$HOME"
+fi
+INSTALL_DIR="${USER_HOME}/self-hosted/supabase"
+mkdir -p "$INSTALL_DIR"
+run_privileged chown -R "${TARGET_USER}:${TARGET_GROUP}" "$INSTALL_DIR" 2>/dev/null || true
 
 # ========================================
 # Step 1: System check
@@ -750,11 +896,14 @@ if [[ "$TOTAL_MEM_MB" -lt 8000 ]]; then
                 run_privileged dd if=/dev/zero of=/swapfile bs=1M count=$((SWAP_GB * 1024))
             run_privileged chmod 600 /swapfile
             run_privileged mkswap /swapfile >/dev/null
-            run_privileged swapon /swapfile
-            if ! grep -q '^/swapfile ' /etc/fstab 2>/dev/null; then
-                echo '/swapfile none swap sw 0 0' | run_privileged tee -a /etc/fstab >/dev/null
+            if run_privileged swapon /swapfile 2>/dev/null; then
+                if ! grep -q '^/swapfile ' /etc/fstab 2>/dev/null; then
+                    echo '/swapfile none swap sw 0 0' | run_privileged tee -a /etc/fstab >/dev/null || true
+                fi
+                pok "$(say "Swap configured." "Đã cấu hình swap.")"
+            else
+                pwn "Could not enable swap (swapon not permitted in container/LXC/OpenVZ). Continuing..."
             fi
-            pok "$(say "Swap configured." "Đã cấu hình swap.")"
         else
             pok "$(say "Swap already exists." "Swap đã tồn tại.")"
         fi
@@ -1051,6 +1200,7 @@ if [[ -n "$PREVIOUS_ENV" ]]; then
     rm -f "$PREVIOUS_ENV"
 fi
 
+chmod 600 .env
 pok "$(say "Saved .env with generated secure credentials." "Đã lưu .env với credentials bảo mật được tạo tự động.")"
 
 # ========================================
@@ -1138,6 +1288,8 @@ else
     }
     pok "$(say "Supabase stack is healthy." "Supabase stack đã healthy.")"
 fi
+
+run_privileged chown "${TARGET_USER}:${TARGET_GROUP}" .env docker-compose.yml supa.sh supabase.sh 2>/dev/null || true
 
 # ========================================
 # Step 9: Summary

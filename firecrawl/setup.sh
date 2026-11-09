@@ -1,10 +1,33 @@
-#!/bin/bash
-
-# setup.sh - FireCrawl Docker Setup
-# Supports: macOS (Apple Silicon), Raspberry Pi, VPS (amd64/arm64)
-# Created by vnROM.net
+#!/usr/bin/env bash
+# ==============================================================================
+# FireCrawl Standalone Setup (Gen 4 Standard)
+# Supports: macOS (Apple Silicon), Raspberry Pi (ARM64), Linux VPS (amd64/arm64)
+# Author: duynghien (vnROM.net)
+# ==============================================================================
 
 set -euo pipefail
+
+on_error() {
+  local exit_code=$?
+  local line_no=${1:-unknown}
+  echo -e "\n\033[0;31m✖ [ERROR] Command failed at line ${line_no} (exit code: ${exit_code}).\033[0m" >&2
+  if command -v docker &>/dev/null && [ -f docker-compose.yml ]; then
+    echo -e "  \033[1;33m→ Check container logs:\033[0m docker compose logs --tail=50" >&2
+  fi
+  exit "$exit_code"
+}
+trap 'on_error $LINENO' ERR
+
+TARGET_USER="${SUDO_USER:-$USER}"
+TARGET_GROUP="$(id -gn "$TARGET_USER" 2>/dev/null || echo "$TARGET_USER")"
+if command -v getent &>/dev/null; then
+    TARGET_HOME="$(getent passwd "$TARGET_USER" 2>/dev/null | cut -d: -f6)"
+else
+    TARGET_HOME="$HOME"
+fi
+TARGET_HOME="${TARGET_HOME:-$HOME}"
+INSTALL_DIR="${INSTALL_DIR:-$TARGET_HOME/self-hosted/firecrawl}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Colors
 GREEN='\033[0;32m'
@@ -17,38 +40,64 @@ BOLD='\033[1m'
 
 pok()  { echo -e "${GREEN}  ✓${NC} $1"; }
 pwn()  { echo -e "${YELLOW}  ⚠${NC} $1"; }
-perr() { echo -e "${RED}  ✗${NC} $1"; exit 1; }
+perr() { echo -e "${RED}  ✗${NC} $1"; }
 
-# ========================================
+# Language Selection (EN/VI)
+APP_LANG="${APP_LANG:-}"
+if [[ -z "$APP_LANG" ]]; then
+    echo ""
+    echo -e "${BOLD}Select Language / Chọn ngôn ngữ:${NC}"
+    echo "  1) Tiếng Việt (mặc định)"
+    echo "  2) English"
+    read -rp "Choice [1-2] (default: 1): " LANG_CHOICE || true
+    case "${LANG_CHOICE:-1}" in
+        2|en|EN) APP_LANG="en" ;;
+        *) APP_LANG="vi" ;;
+    esac
+fi
+
+say() {
+    local en="$1"
+    local vi="$2"
+    if [[ "$APP_LANG" == "vi" ]]; then
+        echo "$vi"
+    else
+        echo "$en"
+    fi
+}
+
+step_title() {
+    local num="$1"
+    local en="$2"
+    local vi="$3"
+    echo ""
+    echo -e "${CYAN}[$num] $(say "$en" "$vi")${NC}"
+}
+
 # Platform Detection
-# ========================================
-OS=$(uname -s)
-ARCH=$(uname -m)
+OS="$(uname -s)"
+ARCH="$(uname -m)"
 
 if [[ "$OS" == "Darwin" ]]; then
     PLATFORM="mac"
-    PLATFORM_LABEL="macOS Apple Silicon"
+    PLATFORM_LABEL="macOS ($ARCH)"
 elif [[ "$OS" == "Linux" ]]; then
     if grep -qi 'raspberry\|raspbian' /proc/device-tree/model 2>/dev/null || \
        grep -qi 'raspberry' /etc/os-release 2>/dev/null; then
         PLATFORM="pi"
-        PLATFORM_LABEL="Raspberry Pi (ARM64)"
+        PLATFORM_LABEL="Raspberry Pi ($ARCH)"
     elif [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
         PLATFORM="vps-arm64"
-        PLATFORM_LABEL="Linux VPS (ARM64)"
-    elif [[ "$ARCH" == "x86_64" ]]; then
-        PLATFORM="vps-amd64"
-        PLATFORM_LABEL="Linux VPS (AMD64)"
+        PLATFORM_LABEL="Linux ARM64"
     else
         PLATFORM="vps-amd64"
-        PLATFORM_LABEL="Linux ($ARCH)"
+        PLATFORM_LABEL="Linux AMD64 ($ARCH)"
     fi
 else
-    echo -e "${RED}Unsupported OS: $OS${NC}"
+    perr "Unsupported OS: $OS"
     exit 1
 fi
 
-# Banner
 echo ""
 echo "================================================================"
 echo -e "${PURPLE}"
@@ -60,186 +109,129 @@ echo " ( (_| | |_| | |_| | | | ( (_| | | | | | ____| | | |"
 echo "  \____|____/ \__  |_| |_|\___ |_| |_|_|_____)_| |_|"
 echo "             (____/      (_____|                    "
 echo ""
-echo "            FireCrawl Setup — $PLATFORM_LABEL"
-echo "================================================================${NC}"
+echo "          FireCrawl Standalone Setup — Gen 4 Standard"
+echo -e "                 Platform: ${PLATFORM_LABEL}${NC}"
+echo "================================================================"
 echo ""
 
-# ========================================
-# Step 1: System Check & Dependencies
-# ========================================
-echo -e "${BOLD}[1/5] System Check${NC}"
+# Step 1: Preflight & Memory Check
+step_title "1/6" "System Preflight & Hardware Check" "Kiểm tra hệ thống & phần cứng"
+
+if [[ "$OS" == "Linux" ]]; then
+    TOTAL_MEM_MB=$(free -m | awk '/^Mem:/{print $2}')
+    TOTAL_SWAP_MB=$(free -m | awk '/^Swap:/{print $2}')
+    echo -e "  • $(say 'RAM:' 'Bộ nhớ RAM:'): ${TOTAL_MEM_MB}MB | $(say 'Swap:' 'Bộ nhớ Swap:'): ${TOTAL_SWAP_MB}MB"
+    
+    if [ "$TOTAL_MEM_MB" -lt 4000 ] && [ "$TOTAL_SWAP_MB" -lt 2000 ]; then
+        pwn "$(say "Low memory detected (<4GB RAM). Building and running FireCrawl requires adequate swap." \
+                   "Phát hiện RAM thấp (<4GB RAM). Quá trình build và chạy FireCrawl cần bộ nhớ Swap đủ lớn.")"
+        read -rp "  $(say 'Would you like to allocate 4GB Swap? [Y/n]: ' 'Bạn có muốn tự động tạo 4GB Swap không? [Y/n]: ') " SWAP_CHOICE || true
+        case "${SWAP_CHOICE:-y}" in
+            y|Y|yes|YES)
+                AVAILABLE_DISK_KB=$(df -P / | awk 'NR==2 {print $4}')
+                if [ "$AVAILABLE_DISK_KB" -gt 6000000 ]; then
+                    echo "  → $(say 'Creating 4GB swapfile...' 'Đang tạo 4GB swapfile...')"
+                    sudo fallocate -l 4G /swapfile 2>/dev/null || sudo dd if=/dev/zero of=/swapfile bs=1M count=4096 status=progress
+                    sudo chmod 600 /swapfile
+                    sudo mkswap /swapfile
+                    if ! sudo swapon /swapfile 2>/dev/null; then
+                        pwn "$(say 'swapon restricted on this virtual environment (LXC/OpenVZ). Skipping swap.' \
+                                   'swapon bị giới hạn trên môi trường ảo hóa này (LXC/OpenVZ). Bỏ qua tạo swap.')"
+                        sudo rm -f /swapfile
+                    else
+                        grep -qxF '/swapfile none swap sw 0 0' /etc/fstab || echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab >/dev/null
+                        pok "$(say '4GB Swap successfully enabled.' 'Đã kích hoạt 4GB Swap thành công.')"
+                    fi
+                else
+                    pwn "$(say 'Insufficient disk space for 4GB swap. Skipping.' 'Không đủ dung lượng ổ cứng để tạo 4GB swap. Bỏ qua.')"
+                fi
+                ;;
+            *)
+                echo "  $(say 'Skipped swap creation.' 'Bỏ qua tạo swap.')"
+                ;;
+        esac
+    fi
+fi
 
 if [[ "$PLATFORM" == "mac" ]]; then
     if ! command -v docker &> /dev/null; then
-        perr "Docker is not installed."
-        echo "  Recommended: Install OrbStack (https://orbstack.dev)"
-        echo "  Or Docker Desktop: https://docs.docker.com/desktop/install/mac-install/"
+        perr "$(say 'Docker is not installed on macOS.' 'Chưa cài đặt Docker trên macOS.')"
+        echo "  OrbStack (recommended): https://orbstack.dev"
         exit 1
     fi
-
-    # Ensure Docker daemon is running
-    if ! docker info &>/dev/null 2>&1; then
-        pwn "Docker daemon not running. Starting Docker Desktop..."
-        open -a Docker 2>/dev/null || true
-        echo -n "  Waiting"
-        for i in {1..30}; do
-            docker info &>/dev/null 2>&1 && break
-            echo -n "."
-            sleep 2
-        done
-        echo ""
-        docker info &>/dev/null || perr "Docker daemon still not running. Start it manually."
-    fi
     pok "Docker: OK"
-
-    if ! docker compose version &> /dev/null; then
-        perr "Docker Compose Plugin not found!"
-    fi
-    pok "Docker Compose: OK"
-
 else
-    # Linux (Pi / VPS): Auto-install Docker
     if ! command -v docker &> /dev/null; then
-        pwn "Docker not found, installing..."
+        pwn "$(say 'Docker not found, installing automatically...' 'Docker chưa cài đặt, đang tự động cài...')"
         curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
-        sudo sh /tmp/get-docker.sh && rm -f /tmp/get-docker.sh
-        sudo usermod -aG docker "$USER" 2>/dev/null || true
-        pok "Docker: installed"
+        sudo sh /tmp/get-docker.sh
+        rm -f /tmp/get-docker.sh
+        sudo usermod -aG docker "$TARGET_USER" 2>/dev/null || true
+        pok "Docker: $(say 'installed' 'đã cài đặt')"
     else
         pok "Docker: OK"
     fi
-
     if ! docker compose version &>/dev/null 2>&1; then
         sudo apt-get update -qq && sudo apt-get install -y -qq docker-compose-plugin 2>/dev/null || true
     fi
     pok "Docker Compose: OK"
-
-    sudo apt-get install -y -qq git curl openssl 2>/dev/null || true
-    pok "System dependencies: OK"
-
-    # Memory check & swap
-    TOTAL_MEM=$(free -m | awk '/^Mem:/{print $2}')
-    pok "RAM: ${TOTAL_MEM}MB"
-    if [ "$TOTAL_MEM" -lt 3000 ]; then
-        if [ ! -f /swapfile ] && ! swapon --show | grep -q '/swapfile'; then
-            pwn "Low RAM (${TOTAL_MEM}MB). Adding 4GB swap for FireCrawl build..."
-            sudo fallocate -l 4G /swapfile 2>/dev/null || sudo dd if=/dev/zero of=/swapfile bs=1M count=4096
-            sudo chmod 600 /swapfile
-            sudo mkswap /swapfile
-            sudo swapon /swapfile
-            echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab > /dev/null
-            pok "Swap: 4GB added"
-        else
-            pok "Swap: already configured"
-        fi
-    fi
 fi
 
-pok "Platform: $PLATFORM_LABEL"
+for c in openssl curl git; do
+    if ! command -v "$c" &>/dev/null; then
+        if [[ "$OS" == "Linux" ]]; then
+            sudo apt-get update -qq && sudo apt-get install -y -qq "$c" 2>/dev/null || true
+        fi
+    fi
+done
 
-# ========================================
-# Step 2: Install Directory & Source
-# ========================================
-echo ""
-echo -e "${BOLD}[2/5] Setting up directory${NC}"
-
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-INSTALL_DIR="$HOME/self-hosted/firecrawl"
+# Step 2: Directory Setup
+step_title "2/6" "Installation Directory & Source Code" "Thư mục cài đặt & mã nguồn"
+echo -e "  • Target directory: ${PURPLE}${INSTALL_DIR}${NC}"
 mkdir -p "$INSTALL_DIR"
-
-# Copy config files from repo to install dir
-if [[ "$SCRIPT_DIR" != "$INSTALL_DIR" ]]; then
-    pwn "Copying configs to $INSTALL_DIR ..."
-    for f in .env .env.example fc.sh; do
-        [[ -f "$SCRIPT_DIR/$f" ]] && cp -n "$SCRIPT_DIR/$f" "$INSTALL_DIR/" 2>/dev/null || true
-    done
-fi
 cd "$INSTALL_DIR"
+mkdir -p data backups
 
-# Clone FireCrawl source (required for build)
 if [ ! -d "firecrawl-source" ]; then
-    pwn "Cloning FireCrawl source code..."
+    echo "  → $(say 'Cloning FireCrawl source code repository...' 'Đang clone mã nguồn FireCrawl...')"
     git clone --depth=1 https://github.com/mendableai/firecrawl.git firecrawl-source
-    pok "FireCrawl source: cloned"
+    pok "$(say 'FireCrawl source cloned.' 'Đã clone source code FireCrawl.')"
 else
-    pok "FireCrawl source: already exists (use 'git pull' in firecrawl-source/ to update)"
+    pok "$(say 'FireCrawl source already exists.' 'Mã nguồn FireCrawl đã có sẵn.')"
 fi
 
-# Create data directory
-mkdir -p data
-pok "Directories: OK"
+# Step 3: Port Conflict Check
+step_title "3/6" "Port Configuration" "Kiểm tra cổng dịch vụ"
 
-# ========================================
-# Step 3: Environment Configuration
-# ========================================
-echo ""
-echo -e "${BOLD}[3/5] Environment configuration${NC}"
-
-if [ ! -f .env ]; then
-    BULL_AUTH_KEY=$(openssl rand -hex 16)
-    POSTGRES_PASSWORD=$(openssl rand -hex 12)
-
-    cat > .env << EOF
-# ===== FireCrawl Self-hosted Configuration =====
-PORT=3002
-HOST=0.0.0.0
-
-# Disable DB authentication (no Supabase needed)
-USE_DB_AUTHENTICATION=false
-
-# Queue admin panel password — change this!
-BULL_AUTH_KEY=${BULL_AUTH_KEY}
-
-# PostgreSQL — uses default 'postgres' user/db (required by nuq.sql init scripts)
-# WARNING: Do not change POSTGRES_USER or POSTGRES_DB — the nuq schema is created
-# in the default 'postgres' database by the nuq-postgres init scripts.
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-POSTGRES_DB=postgres
-
-# AI features (optional — leave blank to disable)
-OPENAI_API_KEY=
-# OPENAI_BASE_URL=https://api.openai.com/v1
-# MODEL_NAME=gpt-4o-mini
-
-# Proxy (optional)
-# PROXY_SERVER=
-# PROXY_USERNAME=
-# PROXY_PASSWORD=
-
-# Performance tuning (adjust based on your server)
-NUM_WORKERS_PER_QUEUE=4
-CRAWL_CONCURRENT_REQUESTS=5
-MAX_CONCURRENT_JOBS=3
-BROWSER_POOL_SIZE=3
-
-# Logging
-LOGGING_LEVEL=INFO
-EOF
-    pok ".env created with secure passwords"
-    echo ""
-    echo -e "  Bull Auth Key:    ${YELLOW}${BULL_AUTH_KEY}${NC}"
-    echo -e "  Postgres Password: ${YELLOW}${POSTGRES_PASSWORD}${NC}"
-    echo ""
-
-    # Offer OpenAI key input
-    echo -e "${YELLOW}Optional: Add OpenAI API key for AI extraction features.${NC}"
-    echo "Press Enter to skip."
-    read -rp "  OpenAI API Key: " OPENAI_KEY || true
-    if [ -n "${OPENAI_KEY:-}" ]; then
-        if [[ "$PLATFORM" == "mac" ]]; then
-            sed -i '' "s/^OPENAI_API_KEY=.*/OPENAI_API_KEY=${OPENAI_KEY}/" .env
-        else
-            sed -i "s/^OPENAI_API_KEY=.*/OPENAI_API_KEY=${OPENAI_KEY}/" .env
-        fi
-        pok "OpenAI API Key saved"
+check_port() {
+    local port="$1"
+    if command -v lsof &>/dev/null; then
+        lsof -i ":$port" -sTCP:LISTEN -Pn &>/dev/null
+    elif command -v ss &>/dev/null; then
+        ss -ltn "sport = :$port" | grep -q ":$port "
+    elif command -v netstat &>/dev/null; then
+        netstat -ltn 2>/dev/null | grep -q ":$port "
+    else
+        return 1
     fi
-else
-    pok ".env already exists (keeping existing config)"
-fi
+}
 
-# Generate docker-compose.yml pointing to source
-cat > docker-compose.yml << 'COMPOSEOF'
+PORT_VAL="${PORT:-3002}"
+if check_port "$PORT_VAL"; then
+    pwn "$(say "Port $PORT_VAL is already in use!" "Cổng $PORT_VAL hiện đang có tiến trình sử dụng!")"
+    ALT_PORT=3003
+    while check_port "$ALT_PORT"; do
+        ALT_PORT=$((ALT_PORT + 1))
+    done
+    read -rp "  $(say "Enter alternative port (default: $ALT_PORT): " "Nhập cổng khác (mặc định: $ALT_PORT): ") " USER_PORT || true
+    PORT_VAL="${USER_PORT:-$ALT_PORT}"
+fi
+pok "$(say "Selected port for FireCrawl: $PORT_VAL" "Cổng hoạt động FireCrawl: $PORT_VAL")"
+
+# Step 4: Authoritative File Generation
+step_title "4/6" "Authoritative Files Generation" "Khởi tạo file cấu hình & script chuẩn"
+
+cat > "$INSTALL_DIR/docker-compose.yml" << 'COMPOSEOF'
 name: firecrawl
 
 x-common-service: &common-service
@@ -260,9 +252,9 @@ x-common-env: &common-env
   REDIS_URL: redis://redis:6379
   REDIS_RATE_LIMIT_URL: redis://redis:6379
   PLAYWRIGHT_MICROSERVICE_URL: http://playwright-service:3000/scrape
-  POSTGRES_USER: ${POSTGRES_USER:-firecrawl}
-  POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-firecrawl_pass}"
-  POSTGRES_DB: ${POSTGRES_DB:-firecrawl}
+  POSTGRES_USER: ${POSTGRES_USER:-postgres}
+  POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-postgres_pass}"
+  POSTGRES_DB: ${POSTGRES_DB:-postgres}
   POSTGRES_HOST: nuq-postgres
   POSTGRES_PORT: 5432
   USE_DB_AUTHENTICATION: ${USE_DB_AUTHENTICATION:-false}
@@ -369,7 +361,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      # Wait for nuq schema to be initialized (nuq.sql runs AFTER pg_isready)
       test: ["CMD-SHELL", "psql -U postgres -d postgres -c 'SELECT 1 FROM nuq.queue_scrape LIMIT 1' > /dev/null 2>&1"]
       interval: 5s
       timeout: 10s
@@ -390,110 +381,279 @@ volumes:
   redis_data:
   postgres_data:
 COMPOSEOF
-pok "docker-compose.yml: generated"
 
-# ========================================
-# Step 4: Build & Deploy
-# ========================================
-echo ""
-echo -e "${BOLD}[4/5] Building and starting containers${NC}"
-pwn "Building FireCrawl from source (first build takes 5-15 min)..."
-echo ""
+cat << 'FC_EOF' > "$INSTALL_DIR/fc.sh"
+#!/usr/bin/env bash
+# fc.sh - FireCrawl management helper (Gen 4 Standard)
+# Usage: ./fc.sh [command]
 
-docker compose up -d --build 2>&1
+set -euo pipefail
 
-pok "All containers started!"
+INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$INSTALL_DIR"
 
-# ========================================
-# Step 5: Verify & Summary
-# ========================================
-echo ""
-echo -e "${BOLD}[5/5] Verification${NC}"
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
 
-# Wait for API to be ready
-PORT_VAL=$(grep -E "^PORT=" .env 2>/dev/null | cut -d= -f2 || echo "3002")
-echo -n "  Waiting for FireCrawl API"
-MAX_WAIT=120
-WAITED=0
-while [ $WAITED -lt $MAX_WAIT ]; do
-    if curl -sf "http://localhost:${PORT_VAL}/health" > /dev/null 2>&1; then
-        echo ""
+PORT=$(grep -E "^PORT=" .env 2>/dev/null | cut -d= -f2 || echo "3002")
+CMD="${1:-help}"
+
+case "$CMD" in
+  start)
+    echo -e "${GREEN}Starting FireCrawl...${NC}"
+    docker compose up -d
+    ;;
+  stop)
+    echo -e "${YELLOW}Stopping FireCrawl...${NC}"
+    docker compose stop
+    ;;
+  restart)
+    echo -e "${YELLOW}Restarting FireCrawl...${NC}"
+    docker compose restart
+    ;;
+  logs)
+    shift || true
+    docker compose logs -f "${@:-api}"
+    ;;
+  status)
+    echo -e "${CYAN}FireCrawl Container Status:${NC}"
+    docker compose ps
+    echo ""
+    echo -e "${CYAN}Health Diagnostics:${NC}"
+    echo -n "  • FireCrawl API: "
+    if curl -sf "http://localhost:${PORT}/v1/health" >/dev/null 2>&1; then
+      echo -e "${GREEN}Healthy (OK)${NC}"
+    else
+      echo -e "${RED}Not responding${NC}"
+    fi
+    echo -n "  • Redis: "
+    if docker exec "$(docker compose ps -q redis 2>/dev/null | head -1)" redis-cli ping &>/dev/null; then
+      echo -e "${GREEN}Healthy (PONG)${NC}"
+    else
+      echo -e "${YELLOW}Not ready${NC}"
+    fi
+    echo -n "  • PostgreSQL (nuq): "
+    if docker exec "$(docker compose ps -q nuq-postgres 2>/dev/null | head -1)" psql -U postgres -d postgres -c 'SELECT 1' &>/dev/null; then
+      echo -e "${GREEN}Ready (OK)${NC}"
+    else
+      echo -e "${YELLOW}Not ready${NC}"
+    fi
+    ;;
+  test)
+    echo -e "${CYAN}Testing FireCrawl scrape...${NC}"
+    curl -X POST "http://localhost:${PORT}/v1/scrape" \
+      -H "Content-Type: application/json" \
+      -d '{"url": "https://example.com", "formats": ["markdown"]}' | head -n 30
+    ;;
+  update)
+    echo -e "${YELLOW}Backing up .env...${NC}"
+    mkdir -p -m 700 backups
+    cp .env "backups/.env.pre-update.$(date +%Y%m%d%H%M%S)"
+    echo -e "${YELLOW}Updating FireCrawl source & rebuilding...${NC}"
+    if [ -d "firecrawl-source" ]; then
+      git -C firecrawl-source pull || true
+    fi
+    docker compose pull redis rabbitmq 2>/dev/null || true
+    docker compose up -d --build
+    echo -e "${GREEN}Update complete!${NC}"
+    ;;
+  backup)
+    BACKUP_DIR="./backups"
+    mkdir -p -m 700 "$BACKUP_DIR"
+    TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
+    DB_ARCHIVE="$BACKUP_DIR/firecrawl_db_$TIMESTAMP.sql.gz"
+    CFG_ARCHIVE="$BACKUP_DIR/firecrawl_cfg_$TIMESTAMP.tar.gz"
+
+    echo -e "${GREEN}Dumping nuq-postgres database...${NC}"
+    PG_CONTAINER="$(docker compose ps -q nuq-postgres 2>/dev/null | head -1)"
+    if [[ -n "$PG_CONTAINER" ]] && docker exec "$PG_CONTAINER" pg_dump -U postgres postgres | gzip > "$DB_ARCHIVE"; then
+      chmod 600 "$DB_ARCHIVE"
+      echo -e "  ${GREEN}✓ Database archived to: $DB_ARCHIVE (chmod 600)${NC}"
+    else
+      echo -e "  ${RED}✗ Database backup failed! Ensure nuq-postgres is running.${NC}"
+    fi
+
+    echo -e "${GREEN}Archiving configuration...${NC}"
+    tar -czf "$CFG_ARCHIVE" .env docker-compose.yml 2>/dev/null || true
+    chmod 600 "$CFG_ARCHIVE"
+    echo -e "  ${GREEN}✓ Configuration archived to: $CFG_ARCHIVE (chmod 600)${NC}"
+    ;;
+  restore)
+    shift || true
+    FILE="${1:-}"
+    if [[ -z "$FILE" || ! -f "$FILE" ]]; then
+      echo -e "${RED}Usage: ./fc.sh restore <path-to-sql-gz-archive>${NC}"
+      exit 1
+    fi
+    echo -e "${YELLOW}Verifying archive integrity...${NC}"
+    gzip -t "$FILE"
+    echo -e "${RED}WARNING: Restoring will overwrite existing nuq-postgres database!${NC}"
+    read -rp "Type 'yes' to proceed: " CONFIRM
+    if [[ "$CONFIRM" == "yes" ]]; then
+      PG_CONTAINER="$(docker compose ps -q nuq-postgres 2>/dev/null | head -1)"
+      gunzip -c "$FILE" | docker exec -i "$PG_CONTAINER" psql -U postgres -d postgres
+      echo -e "${GREEN}✓ Database restore completed! Restarting API...${NC}"
+      docker compose restart api
+    else
+      echo "Restore aborted."
+    fi
+    ;;
+  doctor)
+    echo -e "${BOLD}=== FireCrawl System Doctor ===${NC}"
+    echo -n "Checking Docker... "
+    if docker --version >/dev/null 2>&1; then
+      echo -e "${GREEN}✓ OK${NC}"
+    else
+      echo -e "${RED}✗ Docker not found${NC}"
+    fi
+    echo -n "Checking Docker Compose... "
+    if docker compose version >/dev/null 2>&1; then
+      echo -e "${GREEN}✓ OK${NC}"
+    else
+      echo -e "${RED}✗ Docker Compose not found${NC}"
+    fi
+    echo "Disk space:"
+    df -h . | awk 'NR==2 {print "  Available: " $4 " of " $2}'
+    echo "Checking .env permissions:"
+    if [[ -f .env ]]; then
+      PERMS=$(stat -c "%a" .env 2>/dev/null || stat -f "%Lp" .env 2>/dev/null || echo "unknown")
+      echo "  .env: $PERMS (recommended: 600)"
+    else
+      echo "  [FAIL] .env not found"
+    fi
+    echo -n "Port ${PORT} status: "
+    if command -v lsof &>/dev/null && lsof -i ":${PORT}" -sTCP:LISTEN -Pn &>/dev/null; then
+      echo -e "${GREEN}Listening${NC}"
+    else
+      echo -e "${YELLOW}Not listening${NC}"
+    fi
+    echo -n "API /v1/health endpoint: "
+    if curl -sf "http://localhost:${PORT}/v1/health" >/dev/null 2>&1; then
+      echo -e "${GREEN}Healthy${NC}"
+    else
+      echo -e "${RED}Not responding${NC}"
+    fi
+    ;;
+  uninstall)
+    echo -e "${RED}WARNING: This will completely remove FireCrawl containers, networks, and volumes.${NC}"
+    read -rp "Type 'yes' to proceed: " CONFIRM
+    if [[ "$CONFIRM" == "yes" ]]; then
+      docker compose down -v
+      echo -e "${GREEN}✓ FireCrawl containers and volumes removed.${NC}"
+    else
+      echo "Uninstall canceled."
+    fi
+    ;;
+  help|*)
+    echo -e "${BOLD}Usage:${NC} ./fc.sh {start|stop|restart|logs|status|test|update|backup|restore|doctor|uninstall}"
+    echo ""
+    echo "  start      — Start all containers"
+    echo "  stop       — Stop all containers"
+    echo "  restart    — Restart all containers"
+    echo "  logs [svc] — Follow container logs (default: api)"
+    echo "  status     — Show container status + health diagnostics"
+    echo "  test       — Run test scrape against example.com"
+    echo "  update     — Pull source and rebuild containers"
+    echo "  backup     — Dump PostgreSQL and archive configuration"
+    echo "  restore    — Restore database from backup archive"
+    echo "  doctor     — Run system health diagnostics"
+    echo "  uninstall  — Remove containers and data volumes"
+    ;;
+esac
+FC_EOF
+chmod +x "$INSTALL_DIR/fc.sh"
+
+# Canonical symlinks
+ln -sf fc.sh "$INSTALL_DIR/firecrawl.sh"
+sudo ln -sf "$INSTALL_DIR/fc.sh" /usr/local/bin/fc 2>/dev/null || true
+sudo ln -sf "$INSTALL_DIR/fc.sh" /usr/local/bin/firecrawl 2>/dev/null || true
+
+# Synchronize back to repo if run from within repo
+if [[ "$SCRIPT_DIR" != "$INSTALL_DIR" && -f "$SCRIPT_DIR/fc.sh" ]]; then
+    cp -f "$INSTALL_DIR/fc.sh" "$SCRIPT_DIR/fc.sh" 2>/dev/null || true
+    ln -sf fc.sh "$SCRIPT_DIR/firecrawl.sh" 2>/dev/null || true
+fi
+pok "$(say 'Authoritative configuration and helper CLI created.' 'Đã khởi tạo cấu hình và trình quản lý fc.sh.')"
+
+# Step 5: Environment Setup (.env)
+step_title "5/6" "Configuring Environment (.env)" "Thiết lập biến môi trường"
+
+if [ ! -f .env ]; then
+    BULL_AUTH_KEY=$(openssl rand -hex 16)
+    POSTGRES_PASSWORD=$(openssl rand -hex 12)
+
+    cat > .env << EOF
+# ===== FireCrawl Self-hosted Configuration =====
+PORT=${PORT_VAL}
+HOST=0.0.0.0
+
+# Disable DB authentication (no Supabase needed)
+USE_DB_AUTHENTICATION=false
+
+# Queue admin panel password
+BULL_AUTH_KEY=${BULL_AUTH_KEY}
+
+# PostgreSQL — uses default 'postgres' user/db (required by nuq.sql init scripts)
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+POSTGRES_DB=postgres
+
+# AI features (optional)
+OPENAI_API_KEY=
+
+# Performance tuning
+NUM_WORKERS_PER_QUEUE=4
+CRAWL_CONCURRENT_REQUESTS=5
+MAX_CONCURRENT_JOBS=3
+BROWSER_POOL_SIZE=3
+LOGGING_LEVEL=INFO
+EOF
+    chmod 600 .env
+    pok "$(say '.env initialized (chmod 600).' 'Đã tạo file .env bảo mật (chmod 600).')"
+else
+    chmod 600 .env
+    pok "$(say 'Preserved existing .env (chmod 600).' 'Giữ nguyên file .env hiện có (chmod 600).')"
+fi
+
+# Step 6: Deploy & Service
+step_title "6/6" "Deployment & Health Verification" "Triển khai & Kiểm tra dịch vụ"
+
+if [[ -n "${TARGET_USER:-}" && "$TARGET_USER" != "root" ]]; then
+    chown -R "$TARGET_USER:$TARGET_GROUP" "$INSTALL_DIR" 2>/dev/null || true
+fi
+
+echo "  → $(say 'Building and launching FireCrawl containers...' 'Đang build và khởi động các container FireCrawl...')"
+docker compose up -d --build
+
+echo "  → $(say 'Waiting for FireCrawl API readiness...' 'Đang đợi FireCrawl API sẵn sàng...')"
+for i in $(seq 1 40); do
+    if curl -sf "http://localhost:${PORT_VAL}/v1/health" >/dev/null 2>&1; then
+        pok "$(say 'FireCrawl API is healthy!' 'FireCrawl API đã sẵn sàng!')"
         break
     fi
-    echo -n "."
     sleep 3
-    WAITED=$((WAITED + 3))
 done
-echo ""
 
-ALL_OK=true
-docker exec "$(docker compose ps -q redis 2>/dev/null | head -1)" redis-cli ping &>/dev/null \
-    && pok "Redis: OK" \
-    || { pwn "Redis: starting..."; ALL_OK=false; }
-
-curl -sf "http://localhost:${PORT_VAL}/health" > /dev/null 2>&1 \
-    && pok "FireCrawl API: OK" \
-    || { pwn "FireCrawl API: still starting (check logs)"; ALL_OK=false; }
-
-# Systemd service for Linux
-if [[ "$PLATFORM" != "mac" ]]; then
-    COMPOSE_PATH="$INSTALL_DIR/docker-compose.yml"
-    sudo bash -c "cat > /etc/systemd/system/firecrawl.service << EOF
-[Unit]
-Description=FireCrawl Web Scraper
-After=docker.service
-Requires=docker.service
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-WorkingDirectory=$INSTALL_DIR
-ExecStart=/usr/bin/docker compose -f $COMPOSE_PATH up -d
-ExecStop=/usr/bin/docker compose -f $COMPOSE_PATH down
-TimeoutStartSec=180
-
-[Install]
-WantedBy=multi-user.target
-EOF"
-    sudo systemctl daemon-reload
-    sudo systemctl enable firecrawl.service 2>/dev/null || true
-    pok "Systemd auto-start: enabled"
-fi
-
-LAN_IP="localhost"
-if [[ "$PLATFORM" != "mac" ]]; then
-    LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
-fi
+# Safe host-files-only ownership adjustment post-startup
+find "$INSTALL_DIR" -maxdepth 1 -type f -exec chown "$TARGET_USER:$TARGET_GROUP" {} + 2>/dev/null || true
 
 echo ""
-echo "========================================================"
-if [ "$ALL_OK" = true ]; then
-    echo -e "${GREEN}  🎉 INSTALLATION COMPLETE!${NC}"
-else
-    echo -e "${YELLOW}  ⚠️  INSTALLATION DONE (some services still starting)${NC}"
-fi
-echo ""
-echo -e "  Platform:      ${CYAN}${PLATFORM_LABEL}${NC}"
-echo -e "  FireCrawl API: ${PURPLE}http://localhost:${PORT_VAL}${NC}"
-echo -e "  Queue Admin:   ${PURPLE}http://localhost:${PORT_VAL}/admin/queues${NC}"
-if [[ "$PLATFORM" != "mac" ]]; then
-    echo -e "  LAN URL:       ${PURPLE}http://${LAN_IP}:${PORT_VAL}${NC}"
-fi
-echo ""
-echo -e "${YELLOW}⚠️  IMPORTANT:${NC}"
-echo "  • Credentials are in .env — DO NOT share!"
-echo "  • Path: $INSTALL_DIR/.env"
-echo ""
-echo -e "${CYAN}Quick test:${NC}"
-echo "  curl http://localhost:${PORT_VAL}/v1/health"
-echo "  curl -X POST http://localhost:${PORT_VAL}/v1/scrape \\"
-echo "    -H 'Content-Type: application/json' \\"
-echo "    -d '{\"url\": \"https://example.com\", \"formats\": [\"markdown\"]}'"
-echo ""
-echo -e "${CYAN}Management:${NC}"
-echo "  • Start:   cd $INSTALL_DIR && docker compose up -d"
-echo "  • Stop:    cd $INSTALL_DIR && docker compose down"
-echo "  • Logs:    cd $INSTALL_DIR && docker compose logs -f api"
-echo "  • Update:  cd $INSTALL_DIR && git -C firecrawl-source pull && docker compose up -d --build"
-echo ""
-echo "Support: https://ai.vnrom.net"
+echo "================================================================"
+echo -e "${GREEN}${BOLD}  🎉 $(say 'FIRECRAWL SETUP COMPLETED SUCCESSFULLY!' 'CÀI ĐẶT FIRECRAWL HOÀN TẤT THÀNH CÔNG!')${NC}"
+echo "================================================================"
+echo -e "  • API Endpoint:    ${PURPLE}http://localhost:${PORT_VAL}${NC}"
+echo -e "  • Health Check:    ${PURPLE}http://localhost:${PORT_VAL}/v1/health${NC}"
+echo -e "  • Queue Admin:     ${PURPLE}http://localhost:${PORT_VAL}/admin/queues${NC}"
+echo -e "  • Config file:     ${PURPLE}$INSTALL_DIR/.env${NC} (chmod 600)"
+echo -e "  • Helper CLI:      ${PURPLE}fc${NC} (or firecrawl / ./fc.sh)"
+echo "================================================================"
+echo "$(say 'Quick management commands:' 'Các lệnh quản lý nhanh:'):"
+echo "  • fc status"
+echo "  • fc test"
+echo "  • fc logs"
+echo "  • fc backup"
+echo "  • fc doctor"

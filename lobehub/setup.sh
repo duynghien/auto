@@ -8,6 +8,17 @@
 
 set -euo pipefail
 
+on_error() {
+  local exit_code=$?
+  local line_no=${1:-unknown}
+  echo -e "\n\033[0;31m✖ [ERROR] Command failed at line ${line_no} (exit code: ${exit_code}).\033[0m" >&2
+  if [[ -f "docker-compose.yml" ]]; then
+    echo -e "  \033[1;33m→ Check container logs:\033[0m docker compose logs --tail=50" >&2
+  fi
+  exit "$exit_code"
+}
+trap 'on_error $LINENO' ERR
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -570,6 +581,37 @@ if [[ "$PLATFORM" == "pi" ]]; then
             pok "$(t ok_swap "${CS}MB (OK)")"
         fi
     fi
+elif [[ "$PLATFORM" == vps* ]]; then
+    TOTAL_RAM=$(free -m 2>/dev/null | awk '/^Mem:/{print $2}' || echo "0")
+    TOTAL_SWAP=$(free -m 2>/dev/null | awk '/^Swap:/{print $2}' || echo "0")
+    if [ "${TOTAL_RAM:-0}" -lt 4096 ] && [ "${TOTAL_SWAP:-0}" -lt 2048 ]; then
+        pwn "RAM is under 4GB (${TOTAL_RAM}MB) and Swap is under 2GB (${TOTAL_SWAP}MB)."
+        echo "   LobeHub with PostgreSQL, RustFS/MinIO, and SearXNG recommends at least 2GB swap."
+        FREE_DISK_GB=$(df -BG "$HOME" | awk 'NR==2{gsub(/G/,"",$4);print $4}')
+        if [ "${FREE_DISK_GB:-0}" -ge 8 ]; then
+            if [ -t 0 ]; then
+                read -r -p "Create 2GB swapfile automatically? [Y/n]: " CREATE_SWAP </dev/tty || CREATE_SWAP="y"
+            else
+                CREATE_SWAP="y"
+            fi
+            if [[ ! "$CREATE_SWAP" =~ ^[Nn] ]]; then
+                if command -v sudo >/dev/null 2>&1; then
+                    if sudo fallocate -l 2G /swapfile 2>/dev/null || sudo dd if=/dev/zero of=/swapfile bs=1M count=2048 2>/dev/null; then
+                        sudo chmod 600 /swapfile 2>/dev/null || true
+                        sudo mkswap /swapfile 2>/dev/null || true
+                        if sudo swapon /swapfile 2>/dev/null; then
+                            if ! grep -q '/swapfile' /etc/fstab 2>/dev/null; then
+                                echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab >/dev/null || true
+                            fi
+                            pok "Configured and enabled 2GB swapfile at /swapfile"
+                        else
+                            pwn "Could not enable swap (swapon not permitted in container/LXC/OpenVZ). Continuing..."
+                        fi
+                    fi
+                fi
+            fi
+        fi
+    fi
 fi
 
 if [[ "$PLATFORM" != "mac" ]]; then
@@ -603,8 +645,17 @@ pok "Docker Compose: OK"
 echo ""
 echo "$(t step3)"
 
-INSTALL_DIR="$HOME/self-hosted/lobehub"
+TARGET_USER="${SUDO_USER:-$USER}"
+TARGET_GROUP=$(id -gn "$TARGET_USER" 2>/dev/null || echo "$TARGET_USER")
+if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
+    USER_HOME=$(getent passwd "$SUDO_USER" 2>/dev/null | cut -d: -f6)
+    [ -z "$USER_HOME" ] && USER_HOME="/home/$SUDO_USER"
+else
+    USER_HOME="$HOME"
+fi
+INSTALL_DIR="${USER_HOME}/self-hosted/lobehub"
 mkdir -p "$INSTALL_DIR"
+chown -R "${TARGET_USER}:${TARGET_GROUP}" "$INSTALL_DIR" 2>/dev/null || true
 cd "$INSTALL_DIR"
 pok "Directory: $INSTALL_DIR"
 
@@ -736,11 +787,55 @@ $(t env_warning)
 # Network mode: $NETWORK_MODE
 # =================================================================
 
+# Check port availability
+check_port() {
+    local p=$1
+    if command -v lsof >/dev/null 2>&1; then
+        lsof -iTCP:"$p" -sTCP:LISTEN -n -P >/dev/null 2>&1
+    elif command -v ss >/dev/null 2>&1; then
+        ss -tlpn 2>/dev/null | grep -q ":$p "
+    elif command -v netstat >/dev/null 2>&1; then
+        netstat -tlpn 2>/dev/null | grep -q ":$p "
+    else
+        return 1
+    fi
+}
+
+DEFAULT_LOBE_PORT=3210
+LOBE_PORT=$DEFAULT_LOBE_PORT
+if check_port "$LOBE_PORT"; then
+    pwn "Port $LOBE_PORT is currently in use. Auto-selecting alternative port..."
+    for candidate in 3211 3212 3213 3214 3215; do
+        if ! check_port "$candidate"; then
+            LOBE_PORT=$candidate
+            pok "Auto-selected port $LOBE_PORT for LobeHub"
+            break
+        fi
+    done
+fi
+
+DEFAULT_RUSTFS_PORT=9000
+RUSTFS_PORT=$DEFAULT_RUSTFS_PORT
+if check_port "$RUSTFS_PORT"; then
+    pwn "Port $RUSTFS_PORT is currently in use. Auto-selecting alternative port..."
+    for candidate in 9002 9003 9004 9005; do
+        if ! check_port "$candidate"; then
+            RUSTFS_PORT=$candidate
+            pok "Auto-selected port $RUSTFS_PORT for S3 storage"
+            break
+        fi
+    done
+fi
+
+if [[ "$APP_URL" == *"localhost:3210"* && "$LOBE_PORT" != "3210" ]]; then
+    APP_URL="http://localhost:${LOBE_PORT}"
+fi
+
 # ===========================
 # ====== Preset config ======
 # ===========================
-LOBE_PORT=3210
-RUSTFS_PORT=9000
+LOBE_PORT=$LOBE_PORT
+RUSTFS_PORT=$RUSTFS_PORT
 APP_URL=$APP_URL
 
 # Auth Secrets
@@ -779,6 +874,7 @@ S3_SERVICE=$S3_SERVICE
 # Network mode
 NETWORK_MODE=$NETWORK_MODE
 ENVEOF
+chmod 600 .env
 
 pok "$(t ok_env_saved)"
 
@@ -1345,11 +1441,105 @@ case "$1" in
   status)
     docker compose ps
     ;;
-  upgrade)
+  upgrade|update)
     echo "⬆️  Upgrading LobeHub..."
     docker compose pull
     docker compose up -d
     echo "✅ Upgraded!"
+    ;;
+  backup)
+    BACKUP_DIR="./backups"
+    mkdir -p -m 700 "$BACKUP_DIR"
+    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+    ARCHIVE="$BACKUP_DIR/lobehub-backup-$TIMESTAMP.sql.gz"
+    echo "📦 Backing up PostgreSQL database to $ARCHIVE..."
+    if docker compose ps --services --filter "status=running" 2>/dev/null | grep -q "postgresql"; then
+      PG_USER=$(grep '^POSTGRES_USER=' .env 2>/dev/null | cut -d= -f2- || echo 'postgres')
+      [ -z "$PG_USER" ] && PG_USER="postgres"
+      PG_DB=$(grep '^LOBE_DB_NAME=' .env 2>/dev/null | cut -d= -f2- || echo 'lobechat')
+      [ -z "$PG_DB" ] && PG_DB="lobechat"
+      docker compose exec -T postgresql pg_dump -U "$PG_USER" "$PG_DB" | gzip > "$ARCHIVE"
+      chmod 600 "$ARCHIVE"
+      cp .env "$BACKUP_DIR/.env-$TIMESTAMP" 2>/dev/null || true
+      chmod 600 "$BACKUP_DIR/.env-$TIMESTAMP" 2>/dev/null || true
+      echo "✅ Backup completed: $ARCHIVE"
+    else
+      echo "❌ PostgreSQL container is not running. Run './lobe.sh start' first."
+      exit 1
+    fi
+    ;;
+  restore)
+    RESTORE_FILE="${2:-}"
+    if [[ -z "$RESTORE_FILE" || ! -f "$RESTORE_FILE" ]]; then
+      echo "❌ Usage: ./lobe.sh restore <backup-file.sql.gz>"
+      exit 1
+    fi
+    if ! gzip -t "$RESTORE_FILE" 2>/dev/null; then
+      echo "❌ Backup file is not a valid gzip file: $RESTORE_FILE"
+      exit 1
+    fi
+    if ! docker compose ps --services --filter "status=running" 2>/dev/null | grep -q "postgresql"; then
+      echo "❌ PostgreSQL container is not running. Run './lobe.sh start' first."
+      exit 1
+    fi
+    echo "⚠️  Restoring database from $RESTORE_FILE will overwrite existing data!"
+    read -r -p "Are you sure? (y/N): " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+      echo "Restore cancelled."
+      exit 0
+    fi
+    mkdir -p -m 700 "./backups"
+    PRE_BACKUP="./backups/pre-restore-$(date +%Y%m%d_%H%M%S).sql.gz"
+    echo "📦 Creating pre-restore safety dump at $PRE_BACKUP..."
+    PG_USER=$(grep '^POSTGRES_USER=' .env 2>/dev/null | cut -d= -f2- || echo 'postgres')
+    [ -z "$PG_USER" ] && PG_USER="postgres"
+    PG_DB=$(grep '^LOBE_DB_NAME=' .env 2>/dev/null | cut -d= -f2- || echo 'lobechat')
+    [ -z "$PG_DB" ] && PG_DB="lobechat"
+    docker compose exec -T postgresql pg_dump -U "$PG_USER" "$PG_DB" 2>/dev/null | gzip > "$PRE_BACKUP" || true
+    chmod 600 "$PRE_BACKUP" 2>/dev/null || true
+    echo "🛑 Stopping web app service during restore..."
+    docker compose stop lobe
+    echo "📥 Importing database..."
+    gzip -dc "$RESTORE_FILE" | docker compose exec -T postgresql psql -U "$PG_USER" -d "$PG_DB"
+    echo "🚀 Restarting web service..."
+    docker compose start lobe
+    echo "✅ Database restored successfully!"
+    ;;
+  doctor)
+    echo "🩺 Running LobeHub Diagnostics..."
+    echo "----------------------------------------"
+    echo "1. Container Status:"
+    docker compose ps
+    echo ""
+    echo "2. Port Listeners:"
+    L_PORT=$(grep '^LOBE_PORT=' .env 2>/dev/null | cut -d= -f2- || echo '3210')
+    if command -v lsof >/dev/null 2>&1; then
+      lsof -iTCP:"$L_PORT" -sTCP:LISTEN -n -P || echo "Port $L_PORT not listening"
+    fi
+    echo ""
+    echo "3. Database Connectivity:"
+    PG_USER=$(grep '^POSTGRES_USER=' .env 2>/dev/null | cut -d= -f2- || echo 'postgres')
+    [ -z "$PG_USER" ] && PG_USER="postgres"
+    if docker compose exec -T postgresql pg_isready -U "$PG_USER" 2>/dev/null; then
+      echo "✅ PostgreSQL is accepting connections"
+    else
+      echo "❌ PostgreSQL is not ready"
+    fi
+    echo ""
+    echo "4. S3 Storage Check:"
+    S3_EP=$(grep '^S3_ENDPOINT=' .env 2>/dev/null | cut -d= -f2- || echo '')
+    if [ -n "$S3_EP" ]; then
+      if curl -skf --max-time 5 "$S3_EP" >/dev/null 2>&1 || curl -skf --max-time 5 "$S3_EP/health" >/dev/null 2>&1 || curl -skf --max-time 5 "$S3_EP/minio/health/live" >/dev/null 2>&1; then
+        echo "✅ S3 endpoint reachable ($S3_EP)"
+      else
+        echo "⚠️  S3 endpoint check warning ($S3_EP)"
+      fi
+    fi
+    echo ""
+    echo "5. Disk Space:"
+    df -h . | awk 'NR==1 || NR==2'
+    echo ""
+    echo "Doctor check finished."
     ;;
   search-test)
     echo "🔍 Testing SearXNG..."
@@ -1362,9 +1552,37 @@ case "$1" in
       echo "❌ SearXNG not responding. Check logs: ./lobe.sh logs searxng"
     fi
     ;;
+  uninstall)
+    echo "⚠️  Uninstall LobeHub"
+    echo "Choose uninstall mode:"
+    echo "  1) Stop and remove containers and networks (KEEP data volumes)"
+    echo "  2) FULL PURGE: Remove containers, networks, data volumes, and installation files"
+    echo "  3) Cancel"
+    read -r -p "Select [1-3]: " uopt
+    case "$uopt" in
+      1)
+        docker compose down
+        echo "✅ Containers removed. Data preserved in ./data."
+        ;;
+      2)
+        read -r -p "Are you ABSOLUTELY sure? All conversations, uploads, and database records will be DELETED forever! (type 'yes'): " uconfirm
+        if [[ "$uconfirm" == "yes" ]]; then
+          docker compose down -v --remove-orphans
+          cd ..
+          rm -rf "$(basename "$PWD")"
+          echo "✅ Full purge complete. Directory removed."
+        else
+          echo "Uninstall cancelled."
+        fi
+        ;;
+      *)
+        echo "Cancelled."
+        ;;
+    esac
+    ;;
   reset)
     echo "⚠️  This will DELETE ALL data (database, uploads, secrets)..."
-    read -p "Type 'yes' to confirm: " confirm
+    read -r -p "Type 'yes' to confirm: " confirm
     if [[ "$confirm" == "yes" ]]; then
       docker compose down -v
       rm -rf ./data
@@ -1424,18 +1642,23 @@ case "$1" in
     echo "LobeHub Helper v4.0"
     echo ""
     echo "Usage: ./lobe.sh {command}"
+    echo "       ./lobehub.sh {command}"
     echo ""
     echo "Commands:"
     echo "  start        - Start all services"
     echo "  stop         - Stop all services"
     echo "  restart      - Restart all services"
-    echo "  upgrade      - Pull latest images & restart"
+    echo "  upgrade      - Pull latest images & restart (alias: update)"
     echo "  logs [svc]   - View logs (default: lobe)"
     echo "  status       - Show service status"
+    echo "  backup       - Backup PostgreSQL database and .env"
+    echo "  restore      - Restore PostgreSQL database from backup"
+    echo "  doctor       - Run diagnostic checks"
     echo "  search-test  - Test SearXNG search"
     echo "  s3-test      - Test S3 upload endpoint reachability"
     echo "  secrets      - Show secrets file"
     echo "  s3-login     - Show S3 storage credentials"
+    echo "  uninstall    - Uninstall containers (keep data or full purge)"
     echo "  reset        - ⚠️  Stop and DELETE all data"
     echo ""
     echo "Services: lobe, postgresql, redis, searxng, ${S3_SERVICE:-rustfs}"
@@ -1444,7 +1667,13 @@ esac
 SCRIPTEOF
 
 chmod +x lobe.sh
-pok "Helper script: lobe.sh created!"
+ln -sf lobe.sh lobehub.sh
+if command -v sudo >/dev/null 2>&1; then
+    sudo ln -sf "$PWD/lobe.sh" /usr/local/bin/lobe 2>/dev/null || true
+    sudo ln -sf "$PWD/lobe.sh" /usr/local/bin/lobehub 2>/dev/null || true
+fi
+chown "${TARGET_USER}:${TARGET_GROUP}" .env docker-compose.yml lobe.sh lobehub.sh bucket.config.json 2>/dev/null || true
+pok "Helper script: lobe.sh (and lobehub.sh symlink) created!"
 
 echo ""
 echo "========================================================"

@@ -1,5 +1,16 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+
+on_error() {
+  local exit_code=$?
+  local line_no=${1:-unknown}
+  echo -e "\n\033[0;31m✖ [ERROR] Command failed at line ${line_no} (exit code: ${exit_code}).\033[0m" >&2
+  if [[ -n "${INSTALL_DIR:-}" && -f "${INSTALL_DIR}/docker-compose.yml" ]]; then
+    echo -e "  \033[1;33m→ Check container logs:\033[0m cd \"${INSTALL_DIR}\" && docker compose logs --tail=50" >&2
+  fi
+  exit "$exit_code"
+}
+trap 'on_error $LINENO' ERR
 
 ###############################################################################
 # OpenClaw + n8n + n8n-custom-mcp Stack Setup v2 (by duynghien)
@@ -92,6 +103,8 @@ ENABLE_BACKUP=false
 ENABLE_WEB_BROWSE=true
 ENABLE_MULTI_MODEL=false
 ENABLE_SYSTEM_PROMPT=true
+ANTHROPIC_API_KEY=""
+DEEPSEEK_API_KEY=""
 
 feature_menu() {
     echo -e "${BOLD}┌─────────────────────────────────────────────┐${NC}"
@@ -231,10 +244,39 @@ install_deps() {
     if [[ "$OS" == "linux" ]]; then
         apt update && apt install -y curl git jq
         
+        # RAM & Swap Preflight Guard
+        TOTAL_MEM_MB=$(free -m | awk '/^Mem:/{print $2}')
+        TOTAL_SWAP_MB=$(free -m | awk '/^Swap:/{print $2}')
+        if [ "$TOTAL_MEM_MB" -lt 4000 ] && [ "$TOTAL_SWAP_MB" -lt 2000 ]; then
+            warn "Low memory detected (<4GB RAM and <2GB Swap). OpenClaw + n8n runs best with adequate swap."
+            read -rp "  Would you like to allocate 4GB Swap? [Y/n]: " SWAP_CHOICE || true
+            case "${SWAP_CHOICE:-y}" in
+                y|Y|yes|YES)
+                    AVAILABLE_DISK_KB=$(df -P / | awk 'NR==2 {print $4}')
+                    if [ "$AVAILABLE_DISK_KB" -gt 6000000 ]; then
+                        info "Creating 4GB swapfile..."
+                        fallocate -l 4G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=4096 status=progress
+                        chmod 600 /swapfile
+                        mkswap /swapfile
+                        if ! swapon /swapfile 2>/dev/null; then
+                            warn "swapon restricted on this virtual environment (LXC/OpenVZ). Skipping swap."
+                            rm -f /swapfile
+                        else
+                            grep -qxF '/swapfile none swap sw 0 0' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+                            log "4GB Swap enabled."
+                        fi
+                    else
+                        warn "Insufficient disk space for 4GB swap. Skipping."
+                    fi
+                    ;;
+            esac
+        fi
+
         # Install Docker if not present
         if ! command -v docker &>/dev/null; then
             log "Installing Docker..."
-            curl -fsSL https://get.docker.com | sh
+            curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+            sh /tmp/get-docker.sh && rm -f /tmp/get-docker.sh
         else
             log "Docker already installed."
         fi
@@ -266,7 +308,10 @@ install_deps() {
 create_dirs() {
     step "5/12 — Creating Directories"
     
-    local BASE_DIR="$HOME/self-hosted/openclaw"
+    TARGET_USER="${SUDO_USER:-$USER}"
+    TARGET_GROUP=$(id -gn "$TARGET_USER" 2>/dev/null || echo "$TARGET_USER")
+    ACTUAL_HOME=$(getent passwd "$TARGET_USER" 2>/dev/null | cut -d: -f6 || eval echo "~$TARGET_USER")
+    local BASE_DIR="${ACTUAL_HOME:-$HOME}/self-hosted/openclaw"
     
     export INSTALL_DIR="$BASE_DIR"
     export OPENCLAW_HOME="${INSTALL_DIR}/data"
@@ -275,7 +320,8 @@ create_dirs() {
     
     mkdir -p "$INSTALL_DIR"
     mkdir -p "$OPENCLAW_HOME/workspace/skills/n8n-webhook"
-    mkdir -p "${INSTALL_DIR}/backups"
+    mkdir -p -m 700 "${INSTALL_DIR}/backups"
+    chown -R "$TARGET_USER:$TARGET_GROUP" "$INSTALL_DIR"
     
     log "Directories created at: ${INSTALL_DIR}"
 }
@@ -655,6 +701,12 @@ ENABLE_MULTI_MODEL=${ENABLE_MULTI_MODEL}
 ENABLE_SYSTEM_PROMPT=${ENABLE_SYSTEM_PROMPT}
 FEATEOF
 
+    chmod 600 "${INSTALL_DIR}/.env" "${INSTALL_DIR}/features.env"
+    local t_user="${SUDO_USER:-$USER}"
+    local t_grp
+    t_grp=$(id -gn "$t_user" 2>/dev/null || echo "$t_user")
+    chown "$t_user:$t_grp" "${INSTALL_DIR}/.env" "${INSTALL_DIR}/features.env"
+
     log "Environment files created."
 }
 
@@ -868,7 +920,7 @@ COMPOSEFILE
 
   # ── Watchtower (Auto-update) ─────────────────────────────────
   watchtower:
-    image: containrrr/watchtower
+    image: nickfedor/watchtower:latest
     container_name: watchtower
     restart: unless-stopped
     environment:
@@ -916,6 +968,7 @@ tar czf \${BACKUP_DIR}/openclaw_config_\${DATE}.tar.gz -C ${OPENCLAW_HOME} .
 # Cleanup old backups (keep last 7 days)
 find \${BACKUP_DIR} -name "*.tar.gz" -mtime +7 -delete
 find \${BACKUP_DIR} -name "*.sql.gz" -mtime +7 -delete
+chmod 600 \${BACKUP_DIR}/*\${DATE}* 2>/dev/null || true
 
 echo "[\$(date)] Backup completed."
 BACKUPEOF
@@ -937,75 +990,164 @@ BACKUPEOF
 ###############################################################################
 
 create_helper_script() {
-    cat > "${INSTALL_DIR}/openclaw.sh" << HELPEREOF
+    cat > "${INSTALL_DIR}/openclaw.sh" << 'HELPEREOF'
 #!/bin/bash
 # ═══════════════════════════════════════════
 # OpenClaw Stack Helper (by duynghien)
 # ═══════════════════════════════════════════
 
-DIR="${INSTALL_DIR}"
-cd "\$DIR"
+DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$DIR"
 
-RED='\\033[0;31m'
-GREEN='\\033[1;32m'
-PURPLE='\\033[0;35m'
-NC='\\033[0m'
+RED='\033[0;31m'
+GREEN='\033[1;32m'
+PURPLE='\033[0;35m'
+NC='\033[0m'
 
-case "\$1" in
+case "$1" in
     status)
-        echo -e "\${PURPLE}=== Container Status ===${NC}"
+        echo -e "${PURPLE}=== Container Status ===${NC}"
         docker compose ps
         ;;
     logs)
-        SERVICE="\${2:-}"
-        if [[ -z "\$SERVICE" ]]; then
+        SERVICE="${2:-}"
+        if [[ -z "$SERVICE" ]]; then
             docker compose logs --tail 50 -f
         else
-            docker compose logs --tail 50 -f "\$SERVICE"
+            docker compose logs --tail 50 -f "$SERVICE"
         fi
         ;;
     restart)
-        SERVICE="\${2:-}"
-        if [[ -z "\$SERVICE" ]]; then
+        SERVICE="${2:-}"
+        if [[ -z "$SERVICE" ]]; then
             docker compose restart
         else
-            docker compose restart "\$SERVICE"
+            docker compose restart "$SERVICE"
         fi
-        echo -e "\${GREEN}Restarted.\${NC}"
+        echo -e "${GREEN}Restarted.${NC}"
         ;;
     stop)
         docker compose down
-        echo -e "\${GREEN}All services stopped.\${NC}"
+        echo -e "${GREEN}All services stopped.${NC}"
         ;;
     start)
         docker compose up -d
-        echo -e "\${GREEN}All services started.\${NC}"
+        echo -e "${GREEN}All services started.${NC}"
         ;;
     backup)
-        if [[ -f "\$DIR/backup.sh" ]]; then
-            bash "\$DIR/backup.sh"
+        if [[ -f "$DIR/backup.sh" ]]; then
+            bash "$DIR/backup.sh"
         else
-            echo -e "\${RED}Backup not enabled. Enable in features.env and re-run setup.\${NC}"
+            echo -e "${PURPLE}Running ad-hoc database backup...${NC}"
+            mkdir -p -m 700 "$DIR/backups"
+            DATE=$(date '+%Y%m%d_%H%M%S')
+            docker exec postgres pg_dump -U n8n n8n | gzip > "$DIR/backups/postgres_${DATE}.sql.gz"
+            chmod 600 "$DIR/backups/postgres_${DATE}.sql.gz"
+            echo -e "${GREEN}✓ Database backed up to: $DIR/backups/postgres_${DATE}.sql.gz${NC}"
         fi
         ;;
+    restore)
+        shift || true
+        FILE="${1:-}"
+        if [[ -z "$FILE" || ! -f "$FILE" ]]; then
+            echo -e "${RED}Usage: openclaw.sh restore <path-to-postgres-sql-gz>${NC}"
+            exit 1
+        fi
+        echo -e "${YELLOW}Verifying archive integrity...${NC}"
+        gzip -t "$FILE"
+        echo -e "${RED}WARNING: This will overwrite the n8n database!${NC}"
+        read -rp "Type 'yes' to proceed: " CONFIRM
+        if [[ "$CONFIRM" == "yes" ]]; then
+            gunzip -c "$FILE" | docker compose exec -T postgres psql -U n8n -d n8n
+            echo -e "${GREEN}✓ Database restore completed! Restarting n8n...${NC}"
+            docker compose restart n8n
+        else
+            echo "Restore aborted."
+        fi
+        ;;
+    doctor)
+        echo -e "${PURPLE}=== OpenClaw Diagnostic Doctor ===${NC}"
+        echo -n "Checking Docker... "
+        if docker --version >/dev/null 2>&1; then
+            echo -e "${GREEN}✓ OK${NC}"
+        else
+            echo -e "${RED}✗ Docker not found${NC}"
+        fi
+        echo -n "Checking Docker Compose... "
+        if docker compose version >/dev/null 2>&1; then
+            echo -e "${GREEN}✓ OK${NC}"
+        else
+            echo -e "${RED}✗ Docker Compose not found${NC}"
+        fi
+        echo "Disk space:"
+        df -h . | awk 'NR==2 {print "  Available: " $4 " of " $2}'
+        echo "File permissions:"
+        for f in .env features.env; do
+            if [[ -f "$f" ]]; then
+                P=$(stat -c "%a" "$f" 2>/dev/null || stat -f "%Lp" "$f" 2>/dev/null || echo "unknown")
+                echo "  $f: $P (recommended: 600)"
+            fi
+        done
+        echo "Port bindings:"
+        for p in 5678 18789 3001 5432 6379; do
+            if command -v lsof &>/dev/null && lsof -i ":$p" -sTCP:LISTEN -Pn &>/dev/null; then
+                echo "  [BOUND] Port $p is listening"
+            else
+                echo "  [OPEN/UNKNOWN] Port $p"
+            fi
+        done
+        echo -n "PostgreSQL health: "
+        if docker compose exec postgres pg_isready -U n8n -d n8n &>/dev/null; then
+            echo -e "${GREEN}Ready (OK)${NC}"
+        else
+            echo -e "${YELLOW}Not ready${NC}"
+        fi
+        echo -n "Redis health: "
+        if docker compose exec redis redis-cli ping &>/dev/null; then
+            echo -e "${GREEN}Ready (PONG)${NC}"
+        else
+            echo -e "${YELLOW}Not ready${NC}"
+        fi
+        ;;
+    uninstall)
+        echo -e "${PURPLE}=== OpenClaw Uninstall ===${NC}"
+        echo "  1) Soft Uninstall (Stop and remove containers, keep data)"
+        echo "  2) Full Purge (Permanently destroy all containers and data volumes)"
+        read -rp "Select option [1-2]: " UNINSTALL_CHOICE || true
+        case "${UNINSTALL_CHOICE:-1}" in
+            2)
+                read -rp "Type 'yes' to confirm permanent data destruction: " CONFIRM
+                if [[ "$CONFIRM" == "yes" ]]; then
+                    docker compose down -v
+                    echo -e "${GREEN}✓ All containers and volumes permanently deleted.${NC}"
+                else
+                    echo "Uninstall cancelled."
+                fi
+                ;;
+            *)
+                docker compose down
+                echo -e "${GREEN}✓ Containers removed. Data preserved.${NC}"
+                ;;
+        esac
+        ;;
     update)
-        echo -e "\${PURPLE}Pulling latest images...\${NC}"
+        echo -e "${PURPLE}Pulling latest images...${NC}"
         docker compose pull
         docker compose up -d
-        echo -e "\${GREEN}Updated.\${NC}"
+        echo -e "${GREEN}Updated.${NC}"
         ;;
     features)
-        echo -e "\${PURPLE}=== Feature Toggles ===${NC}"
-        cat "\$DIR/features.env"
+        echo -e "${PURPLE}=== Feature Toggles ===${NC}"
+        cat "$DIR/features.env"
         echo ""
-        echo -e "Edit with: \${PURPLE}nano \$DIR/features.env\${NC}"
+        echo -e "Edit with: ${PURPLE}nano $DIR/features.env${NC}"
         ;;
     env)
-        echo -e "\${PURPLE}=== Environment (sensitive data hidden) ===${NC}"
-        cat "\$DIR/.env" | sed 's/\(=\).*/\1***/'
+        echo -e "${PURPLE}=== Environment (sensitive data hidden) ===${NC}"
+        cat "$DIR/.env" | sed 's/\(=\).*/\1***/'
         ;;
     *)
-        echo -e "\${PURPLE}OpenClaw Stack Helper\${NC}"
+        echo -e "${PURPLE}OpenClaw Stack Helper (Gen 4 Standard)${NC}"
         echo ""
         echo "Usage: openclaw.sh <command> [service]"
         echo ""
@@ -1015,7 +1157,10 @@ case "\$1" in
         echo "  restart [svc]    Restart all or specific service"
         echo "  start            Start all services"
         echo "  stop             Stop all services"
-        echo "  backup           Run manual backup"
+        echo "  backup           Run backup"
+        echo "  restore <file>   Restore database from archive"
+        echo "  doctor           Run diagnostic health checks"
+        echo "  uninstall        Soft or complete uninstall"
         echo "  update           Pull latest images and restart"
         echo "  features         View feature toggles"
         echo "  env              View environment (values hidden)"

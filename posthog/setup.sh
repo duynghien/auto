@@ -8,6 +8,17 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+on_error() {
+  local exit_code=$?
+  local line_no=${1:-unknown}
+  echo -e "\n\033[0;31m✖ [ERROR] Command failed at line ${line_no} (exit code: ${exit_code}).\033[0m" >&2
+  if [[ -f "docker-compose.yml" ]]; then
+    echo -e "  \033[1;33m→ Check container logs:\033[0m docker compose logs --tail=50" >&2
+  fi
+  exit "$exit_code"
+}
+trap 'on_error $LINENO' ERR
+
 prepend_path_if_missing() {
     local dir="$1"
     [[ -d "$dir" ]] || return 0
@@ -683,17 +694,21 @@ if [[ "$TOTAL_MEM_MB" -lt 8000 ]]; then
     pwn "$(say "PostHog hobby deploy is recommended with 8GB+ RAM." "PostHog hobby deploy khuyến nghị RAM 8GB+.")"
 
     if [[ "$PLATFORM" != "mac" ]]; then
-        if ! swapon --show | grep -q '/swapfile'; then
+        if ! swapon --show 2>/dev/null | grep -q '/swapfile'; then
             pwn "$(say "Creating 4GB swap to improve stability..." "Đang tạo swap 4GB để tăng ổn định...")"
-            run_privileged fallocate -l 4G /swapfile 2>/dev/null || \
-                run_privileged dd if=/dev/zero of=/swapfile bs=1M count=4096
-            run_privileged chmod 600 /swapfile
-            run_privileged mkswap /swapfile >/dev/null
-            run_privileged swapon /swapfile
-            if ! grep -q '^/swapfile ' /etc/fstab 2>/dev/null; then
-                echo '/swapfile none swap sw 0 0' | run_privileged tee -a /etc/fstab >/dev/null
+            if run_privileged fallocate -l 4G /swapfile 2>/dev/null || \
+                run_privileged dd if=/dev/zero of=/swapfile bs=1M count=4096 2>/dev/null; then
+                run_privileged chmod 600 /swapfile 2>/dev/null || true
+                run_privileged mkswap /swapfile >/dev/null 2>&1 || true
+                if run_privileged swapon /swapfile 2>/dev/null; then
+                    if ! grep -q '^/swapfile ' /etc/fstab 2>/dev/null; then
+                        echo '/swapfile none swap sw 0 0' | run_privileged tee -a /etc/fstab >/dev/null || true
+                    fi
+                    pok "$(say "Swap 4GB configured." "Đã cấu hình swap 4GB.")"
+                else
+                    pwn "Could not enable swap (swapon not permitted in container/LXC/OpenVZ). Continuing..."
+                fi
             fi
-            pok "$(say "Swap 4GB configured." "Đã cấu hình swap 4GB.")"
         else
             pok "$(say "Swap already exists." "Swap đã tồn tại.")"
         fi
@@ -747,7 +762,14 @@ if ! [[ "$APP_PORT" =~ ^[0-9]+$ ]] || [[ "$APP_PORT" -lt 1 || "$APP_PORT" -gt 65
 fi
 
 if port_in_use "$APP_PORT"; then
-    perr "$(say "Port is already in use:" "Cổng đang được sử dụng:") $APP_PORT"
+    pwn "$(say "Port is already in use:" "Cổng đang được sử dụng:") $APP_PORT"
+    for candidate in 8001 8002 8003 8004 8005; do
+        if ! port_in_use "$candidate"; then
+            APP_PORT=$candidate
+            pok "$(say "Auto-selected available port:" "Tự động chọn cổng khả dụng:") $APP_PORT"
+            break
+        fi
+    done
 fi
 
 NETWORK_MODE="localhost"
@@ -805,8 +827,17 @@ pok "$(say "App URL:" "URL truy cập:") $APP_URL"
 echo ""
 echo -e "${BOLD}$(step_title 3)${NC}"
 
-INSTALL_DIR="$HOME/self-hosted/posthog"
+TARGET_USER="${SUDO_USER:-$USER}"
+TARGET_GROUP=$(id -gn "$TARGET_USER" 2>/dev/null || echo "$TARGET_USER")
+if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
+    USER_HOME=$(getent passwd "$SUDO_USER" 2>/dev/null | cut -d: -f6)
+    [ -z "$USER_HOME" ] && USER_HOME="/home/$SUDO_USER"
+else
+    USER_HOME="$HOME"
+fi
+INSTALL_DIR="${USER_HOME}/self-hosted/posthog"
 mkdir -p "$INSTALL_DIR"
+run_privileged chown -R "${TARGET_USER}:${TARGET_GROUP}" "$INSTALL_DIR" 2>/dev/null || true
 cd "$INSTALL_DIR"
 pok "$(say "Install directory:" "Thư mục cài đặt:") $INSTALL_DIR"
 
@@ -900,6 +931,7 @@ TLS_BLOCK=$CADDY_TLS_BLOCK
 ELAPSED=0
 TIMEOUT=60
 ENVEOF
+chmod 600 .env
 
 pok "$(say "Saved .env with secure secrets." "Đã lưu .env với secrets bảo mật.")"
 
@@ -1439,7 +1471,7 @@ case "${1:-}" in
       exit 1
     fi
     ;;
-  upgrade)
+  upgrade|update)
     echo "⬆️  Upgrading PostHog source and containers..."
     if [[ -d posthog ]]; then
       refresh_source_snapshot || true
@@ -1450,6 +1482,124 @@ case "${1:-}" in
     compose_up
     apply_runtime_preflight_patch
     echo "✅ Upgrade complete"
+    ;;
+  backup)
+    BACKUP_DIR="./backups"
+    mkdir -p -m 700 "$BACKUP_DIR"
+    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+    ARCHIVE="$BACKUP_DIR/posthog-db-$TIMESTAMP.sql.gz"
+    echo "📦 Backing up PostgreSQL database to $ARCHIVE..."
+    if dc ps --services --filter "status=running" 2>/dev/null | grep -qx "db"; then
+      dc exec -T db pg_dump -U "posthog" "posthog" | gzip > "$ARCHIVE"
+      chmod 600 "$ARCHIVE"
+      echo "✅ Database backup complete: $ARCHIVE"
+    else
+      echo "❌ Database service 'db' is not running. Run './hog.sh start' first."
+      exit 1
+    fi
+    cp .env "$BACKUP_DIR/.env-$TIMESTAMP" 2>/dev/null || true
+    chmod 600 "$BACKUP_DIR/.env-$TIMESTAMP" 2>/dev/null || true
+    ;;
+  restore)
+    RESTORE_FILE="${2:-}"
+    if [[ -z "$RESTORE_FILE" || ! -f "$RESTORE_FILE" ]]; then
+      echo "❌ Usage: ./hog.sh restore <backup-file.sql.gz>"
+      exit 1
+    fi
+    if ! gzip -t "$RESTORE_FILE" 2>/dev/null; then
+      echo "❌ Backup file is not a valid gzip file: $RESTORE_FILE"
+      exit 1
+    fi
+    if ! dc ps --services --filter "status=running" 2>/dev/null | grep -qx "db"; then
+      echo "❌ Database service 'db' is not running. Run './hog.sh start' first."
+      exit 1
+    fi
+    echo "⚠️  Restoring PostgreSQL database from $RESTORE_FILE will overwrite existing data!"
+    read -r -p "Are you sure? (y/N): " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+      echo "Restore cancelled."
+      exit 0
+    fi
+    mkdir -p -m 700 "./backups"
+    PRE_BACKUP="./backups/pre-restore-$(date +%Y%m%d_%H%M%S).sql.gz"
+    echo "📦 Creating safety pre-restore backup at $PRE_BACKUP..."
+    dc exec -T db pg_dump -U "posthog" "posthog" 2>/dev/null | gzip > "$PRE_BACKUP" || true
+    chmod 600 "$PRE_BACKUP" 2>/dev/null || true
+    echo "🛑 Stopping web & worker services during restore..."
+    dc stop web plugins async-web 2>/dev/null || true
+    echo "📥 Importing database..."
+    gzip -dc "$RESTORE_FILE" | dc exec -T db psql -U "posthog" -d "posthog"
+    echo "🚀 Restarting services..."
+    dc start
+    echo "✅ Database restored successfully!"
+    ;;
+  doctor)
+    echo "🩺 Running PostHog Diagnostics..."
+    echo "----------------------------------------"
+    echo "1. Container Status:"
+    dc ps
+    echo ""
+    echo "2. Port Listeners:"
+    PORT=$(http_port)
+    if command -v lsof >/dev/null 2>&1; then
+      lsof -iTCP:"$PORT" -sTCP:LISTEN -n -P || echo "Port $PORT not listening"
+    fi
+    echo ""
+    echo "3. Health Check:"
+    if curl -fsS "http://localhost:${PORT}/_health" >/dev/null 2>&1; then
+      echo "✅ Web Health OK (/_health)"
+    else
+      echo "⚠️  Web Health check failed on port $PORT"
+    fi
+    echo ""
+    echo "4. Database Check:"
+    if dc exec -T db pg_isready -U "posthog" 2>/dev/null; then
+      echo "✅ PostgreSQL (db) is ready"
+    else
+      echo "❌ PostgreSQL is not ready"
+    fi
+    echo ""
+    echo "5. ClickHouse Check:"
+    if dc ps --services 2>/dev/null | grep -qx "clickhouse"; then
+      if dc exec -T clickhouse clickhouse-client --query "SELECT 1" >/dev/null 2>&1; then
+        echo "✅ ClickHouse is responding"
+      else
+        echo "⚠️  ClickHouse check warning"
+      fi
+    fi
+    echo ""
+    echo "6. Disk Space:"
+    df -h . | awk 'NR==1 || NR==2'
+    echo ""
+    echo "Doctor check finished."
+    ;;
+  uninstall)
+    echo "⚠️  Uninstall PostHog"
+    echo "Choose uninstall mode:"
+    echo "  1) Stop and remove containers and networks (KEEP data volumes)"
+    echo "  2) FULL PURGE: Remove containers, networks, data volumes, and installation files"
+    echo "  3) Cancel"
+    read -r -p "Select [1-3]: " uopt
+    case "$uopt" in
+      1)
+        dc down
+        echo "✅ Containers removed. Data preserved in volumes."
+        ;;
+      2)
+        read -r -p "Are you ABSOLUTELY sure? All events, dashboards, and databases will be DELETED forever! (type 'yes'): " uconfirm
+        if [[ "$uconfirm" == "yes" ]]; then
+          dc down -v --remove-orphans
+          cd ..
+          rm -rf "$(basename "$PWD")"
+          echo "✅ Full purge complete. Directory removed."
+        else
+          echo "Uninstall cancelled."
+        fi
+        ;;
+      *)
+        echo "Cancelled."
+        ;;
+    esac
     ;;
   reset)
     echo "⚠️  This will DELETE all PostHog data volumes."
@@ -1468,21 +1618,31 @@ case "${1:-}" in
     echo "Usage: ./hog.sh {command}"
     echo ""
     echo "Commands:"
-    echo "  start      - Start/upgrade stack"
-    echo "  start-full - Start with optional profiles (temporal + exceptions)"
-    echo "  stop       - Stop services"
-    echo "  restart    - Restart services"
-    echo "  status     - Show service status"
-    echo "  logs [svc] - Follow logs (default: web)"
-    echo "  health     - Check /_health endpoint"
-    echo "  upgrade    - Pull latest source and restart"
-    echo "  reset      - Delete all local data"
+    echo "  start       - Start/upgrade stack"
+    echo "  start-full  - Start with optional profiles (temporal + exceptions)"
+    echo "  stop        - Stop services"
+    echo "  restart     - Restart services"
+    echo "  status      - Show service status"
+    echo "  logs [svc]  - Follow logs (default: web)"
+    echo "  health      - Check /_health endpoint"
+    echo "  backup      - Safe database & .env backup to ./backups"
+    echo "  restore <f> - Restore database from backup file"
+    echo "  doctor      - Run diagnostic checks"
+    echo "  upgrade     - Pull latest source and restart (alias: update)"
+    echo "  uninstall   - Uninstall containers (keep data or purge)"
+    echo "  reset       - Delete all local data"
     ;;
 esac
 HELPEOF
 
 chmod +x hog.sh
-pok "$(say "Helper script created: ./hog.sh" "Đã tạo helper script: ./hog.sh")"
+ln -sf hog.sh posthog.sh
+if command -v sudo >/dev/null 2>&1; then
+    sudo ln -sf "$PWD/hog.sh" /usr/local/bin/hog 2>/dev/null || true
+    sudo ln -sf "$PWD/hog.sh" /usr/local/bin/posthog 2>/dev/null || true
+fi
+run_privileged chown "${TARGET_USER}:${TARGET_GROUP}" .env docker-compose.yml docker-compose.base.yml hog.sh posthog.sh 2>/dev/null || true
+pok "$(say "Helper script created: ./hog.sh (and posthog.sh symlink)" "Đã tạo helper script: ./hog.sh (và symlink posthog.sh)")"
 
 echo ""
 echo "========================================================"

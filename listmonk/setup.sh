@@ -8,6 +8,17 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+on_error() {
+  local exit_code=$?
+  local line_no=${1:-unknown}
+  echo -e "\n\033[0;31m✖ [ERROR] Command failed at line ${line_no} (exit code: ${exit_code}).\033[0m" >&2
+  if [[ -f "docker-compose.yml" ]]; then
+    echo -e "  \033[1;33m→ Check container logs:\033[0m docker compose logs --tail=50" >&2
+  fi
+  exit "$exit_code"
+}
+trap 'on_error $LINENO' ERR
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -398,7 +409,14 @@ if ! [[ "$APP_PORT" =~ ^[0-9]+$ ]] || [[ "$APP_PORT" -lt 1 || "$APP_PORT" -gt 65
 fi
 
 if [[ "$TEST_MODE" != "1" ]] && port_in_use "$APP_PORT"; then
-    perr "$(say "Port is already in use:" "Cổng đang được sử dụng:") $APP_PORT"
+    pwn "$(say "Port is already in use:" "Cổng đang được sử dụng:") $APP_PORT"
+    for candidate in 9002 9003 9004 9005; do
+        if ! port_in_use "$candidate"; then
+            APP_PORT=$candidate
+            pok "$(say "Auto-selected available port:" "Tự động chọn cổng khả dụng:") $APP_PORT"
+            break
+        fi
+    done
 fi
 
 NETWORK_MODE="localhost"
@@ -441,10 +459,20 @@ pok "$(say "App URL:" "URL truy cập:") $APP_URL"
 echo ""
 echo -e "${BOLD}$(step_title 3)${NC}"
 
-INSTALL_DIR="$HOME/self-hosted/listmonk"
+TARGET_USER="${SUDO_USER:-$USER}"
+TARGET_GROUP=$(id -gn "$TARGET_USER" 2>/dev/null || echo "$TARGET_USER")
+if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
+    USER_HOME=$(getent passwd "$SUDO_USER" 2>/dev/null | cut -d: -f6)
+    [ -z "$USER_HOME" ] && USER_HOME="/home/$SUDO_USER"
+else
+    USER_HOME="$HOME"
+fi
+INSTALL_DIR="${USER_HOME}/self-hosted/listmonk"
 mkdir -p "$INSTALL_DIR"
+run_privileged chown -R "${TARGET_USER}:${TARGET_GROUP}" "$INSTALL_DIR" 2>/dev/null || true
 cd "$INSTALL_DIR"
 mkdir -p uploads
+mkdir -p -m 700 backups
 pok "$(say "Install directory:" "Thư mục cài đặt:") $INSTALL_DIR"
 
 # ========================================
@@ -500,6 +528,7 @@ LISTMONK_DB_PORT=5432
 LISTMONK_ADMIN_USER=$LISTMONK_ADMIN_USER
 LISTMONK_ADMIN_PASSWORD=$LISTMONK_ADMIN_PASSWORD
 ENVEOF
+chmod 600 .env
 
 pok "$(say "Saved .env with secure defaults." "Đã lưu .env với cấu hình bảo mật.")"
 
@@ -744,13 +773,124 @@ case "${1:-}" in
       exit 1
     fi
     ;;
+  upgrade|update)
+    echo "⬆️  Upgrading Listmonk images..."
+    dc pull
+    dc up -d
+    echo "✅ Upgrade complete"
+    ;;
   backup)
-    FILE="$(backup_name)"
+    mkdir -p -m 700 backups
+    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+    FILE="backups/listmonk-db-backup-$TIMESTAMP.sql.gz"
     USERNAME="$(db_user)"
     DATABASE="$(db_name)"
-    echo "📦 Creating DB backup: $FILE"
-    dc exec -T db pg_dump -U "$USERNAME" "$DATABASE" > "$FILE"
-    echo "✅ Backup saved: $FILE"
+    echo "📦 Backing up PostgreSQL database to $FILE..."
+    if dc ps --services --filter "status=running" 2>/dev/null | grep -qx "db"; then
+      dc exec -T db pg_dump -U "$USERNAME" "$DATABASE" | gzip > "$FILE"
+      chmod 600 "$FILE"
+      cp .env "backups/.env-$TIMESTAMP" 2>/dev/null || true
+      chmod 600 "backups/.env-$TIMESTAMP" 2>/dev/null || true
+      echo "✅ Backup saved: $FILE"
+    else
+      echo "❌ Database service 'db' is not running. Run './listmonk.sh start' first."
+      exit 1
+    fi
+    ;;
+  restore)
+    RESTORE_FILE="${2:-}"
+    if [[ -z "$RESTORE_FILE" || ! -f "$RESTORE_FILE" ]]; then
+      echo "❌ Usage: ./listmonk.sh restore <backup-file.sql.gz>"
+      exit 1
+    fi
+    if ! gzip -t "$RESTORE_FILE" 2>/dev/null; then
+      echo "❌ Backup file is not a valid gzip file: $RESTORE_FILE"
+      exit 1
+    fi
+    if ! dc ps --services --filter "status=running" 2>/dev/null | grep -qx "db"; then
+      echo "❌ Database service 'db' is not running. Run './listmonk.sh start' first."
+      exit 1
+    fi
+    USERNAME="$(db_user)"
+    DATABASE="$(db_name)"
+    echo "⚠️  Restoring database from $RESTORE_FILE will overwrite current Listmonk data!"
+    read -r -p "Are you sure? (y/N): " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+      echo "Restore cancelled."
+      exit 0
+    fi
+    mkdir -p -m 700 backups
+    PRE_BACKUP="backups/pre-restore-$(date +%Y%m%d_%H%M%S).sql.gz"
+    echo "📦 Creating safety pre-restore backup at $PRE_BACKUP..."
+    dc exec -T db pg_dump -U "$USERNAME" "$DATABASE" 2>/dev/null | gzip > "$PRE_BACKUP" || true
+    chmod 600 "$PRE_BACKUP" 2>/dev/null || true
+    echo "🛑 Stopping web app during restore..."
+    dc stop app 2>/dev/null || true
+    echo "📥 Importing database..."
+    gzip -dc "$RESTORE_FILE" | dc exec -T db psql -U "$USERNAME" -d "$DATABASE"
+    echo "🚀 Restarting web service..."
+    dc start app
+    echo "✅ Database restored successfully!"
+    ;;
+  doctor)
+    echo "🩺 Running Listmonk Diagnostics..."
+    echo "----------------------------------------"
+    echo "1. Container Status:"
+    dc ps
+    echo ""
+    echo "2. Port Listeners:"
+    PORT=$(http_port)
+    if command -v lsof >/dev/null 2>&1; then
+      lsof -iTCP:"$PORT" -sTCP:LISTEN -n -P || echo "Port $PORT not listening"
+    fi
+    echo ""
+    echo "3. Health Check:"
+    if curl -fsS "http://localhost:${PORT}" >/dev/null 2>&1; then
+      echo "✅ Web OK (http://localhost:${PORT})"
+    else
+      echo "⚠️  Web check warning (http://localhost:${PORT})"
+    fi
+    echo ""
+    echo "4. Database Check:"
+    USERNAME="$(db_user)"
+    if dc exec -T db pg_isready -U "$USERNAME" 2>/dev/null; then
+      echo "✅ PostgreSQL (db) is ready"
+    else
+      echo "❌ PostgreSQL is not ready"
+    fi
+    echo ""
+    echo "5. Disk Space:"
+    df -h . | awk 'NR==1 || NR==2'
+    echo ""
+    echo "Doctor check finished."
+    ;;
+  uninstall)
+    echo "⚠️  Uninstall Listmonk"
+    echo "Choose uninstall mode:"
+    echo "  1) Stop and remove containers and networks (KEEP data volumes)"
+    echo "  2) FULL PURGE: Remove containers, networks, data volumes, and installation files"
+    echo "  3) Cancel"
+    read -r -p "Select [1-3]: " uopt
+    case "$uopt" in
+      1)
+        dc down
+        echo "✅ Containers removed. Data preserved in volumes."
+        ;;
+      2)
+        read -r -p "Are you ABSOLUTELY sure? All subscribers, lists, and campaigns will be DELETED forever! (type 'yes'): " uconfirm
+        if [[ "$uconfirm" == "yes" ]]; then
+          dc down -v --remove-orphans
+          cd ..
+          rm -rf "$(basename "$PWD")"
+          echo "✅ Full purge complete. Directory removed."
+        else
+          echo "Uninstall cancelled."
+        fi
+        ;;
+      *)
+        echo "Cancelled."
+        ;;
+    esac
     ;;
   db-shell)
     USERNAME="$(db_user)"
@@ -785,22 +925,29 @@ case "${1:-}" in
     echo "Usage: ./listmonk.sh {command}"
     echo ""
     echo "Commands:"
-    echo "  start       - Start/upgrade stack"
+    echo "  start       - Start services"
     echo "  stop        - Stop services"
     echo "  restart     - Restart services"
     echo "  status      - Show service status"
     echo "  logs [svc]  - Follow logs (default: app)"
     echo "  health      - Check Listmonk web endpoint"
-    echo "  backup      - Backup Postgres to current directory"
+    echo "  backup      - Safe database & .env backup to ./backups"
+    echo "  restore <f> - Safe database restore with pre-restore dump"
+    echo "  doctor      - Run diagnostic checks"
     echo "  db-shell    - Open psql shell"
     echo "  admin       - Show bootstrap admin credentials"
-    echo "  upgrade     - Pull latest images and restart"
+    echo "  upgrade     - Pull latest images and restart (alias: update)"
+    echo "  uninstall   - Uninstall containers (keep data or full purge)"
     echo "  reset       - Delete all local data"
     ;;
 esac
 HELPEOF
 
 chmod +x listmonk.sh
+if command -v sudo >/dev/null 2>&1; then
+    sudo ln -sf "$PWD/listmonk.sh" /usr/local/bin/listmonk 2>/dev/null || true
+fi
+run_privileged chown "${TARGET_USER}:${TARGET_GROUP}" .env docker-compose.yml listmonk.sh 2>/dev/null || true
 pok "$(say "Helper script created: ./listmonk.sh" "Đã tạo helper script: ./listmonk.sh")"
 
 echo ""

@@ -1,11 +1,7 @@
 services:
   anycrawl:
     container_name: anycrawl_core
-    image: anycrawl/anycrawl:latest # Using official image, but overriding cmd
-    build:
-      context: ./anycrawl-source
-      dockerfile: Dockerfile
-      target: runtime
+    image: anycrawl/anycrawl:latest
     restart: unless-stopped
     environment:
       # --- System ---
@@ -116,19 +112,24 @@ services:
   # Optional: Create bucket automatically
   mc:
     image: minio/mc
+    restart: "no"
     depends_on:
       minio:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c '
       set -eu
-      until /usr/bin/mc alias set myminio http://minio:9000 "${MINIO_ROOT_USER}" "${MINIO_ROOT_PASSWORD}" >/dev/null 2>&1; do
+      for i in $$(seq 1 15); do
+        if /usr/bin/mc alias set myminio http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" >/dev/null 2>&1; then
+          break
+        fi
         sleep 2
       done
-      if ! /usr/bin/mc ls "myminio/${ANYCRAWL_S3_BUCKET:-anycrawl-data}" >/dev/null 2>&1; then
-        /usr/bin/mc mb "myminio/${ANYCRAWL_S3_BUCKET:-anycrawl-data}" >/dev/null
+      if ! /usr/bin/mc ls "myminio/$${ANYCRAWL_S3_BUCKET:-anycrawl-data}" >/dev/null 2>&1; then
+        /usr/bin/mc mb "myminio/$${ANYCRAWL_S3_BUCKET:-anycrawl-data}" >/dev/null 2>&1 || true
       fi
-      /usr/bin/mc anonymous set public "myminio/${ANYCRAWL_S3_BUCKET:-anycrawl-data}" >/dev/null
+      /usr/bin/mc anonymous set download "myminio/$${ANYCRAWL_S3_BUCKET:-anycrawl-data}" >/dev/null 2>&1 || true
+      exit 0
       '
     networks:
       - anycrawl-network

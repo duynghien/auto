@@ -190,17 +190,103 @@ case "${1:-help}" in
         docker compose exec crawl4ai /bin/bash || docker compose exec crawl4ai /bin/sh
         ;;
 
+    backup)
+        BACKUP_DIR="./backups"
+        mkdir -p -m 700 "$BACKUP_DIR"
+        TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
+        ARCHIVE="$BACKUP_DIR/crawl4ai_backup_$TIMESTAMP.tar.gz"
+        echo -e "${GREEN}Creating Crawl4AI configuration and state backup...${NC}"
+        tar -czf "$ARCHIVE" .env .llm.env config.yml docker-compose.yml 2>/dev/null || true
+        chmod 600 "$ARCHIVE"
+        echo -e "${GREEN}✓ Backup created: $ARCHIVE (chmod 600)${NC}"
+        ;;
+
+    restore)
+        shift || true
+        FILE="${1:-}"
+        if [[ -z "$FILE" || ! -f "$FILE" ]]; then
+            echo -e "${RED}Usage: ./c4ai.sh restore <path-to-tar-gz-archive>${NC}"
+            exit 1
+        fi
+        echo -e "${YELLOW}Verifying archive integrity...${NC}"
+        gzip -t "$FILE"
+        echo -e "${YELLOW}WARNING: This will overwrite existing configurations with archive contents!${NC}"
+        read -rp "Type 'yes' to proceed: " CONFIRM
+        if [[ "$CONFIRM" == "yes" ]]; then
+            tar -xzf "$FILE"
+            chmod 600 .env .llm.env 2>/dev/null || true
+            echo -e "${GREEN}✓ Restore completed! Restarting stack...${NC}"
+            docker compose restart
+        else
+            echo "Restore aborted."
+        fi
+        ;;
+
+    doctor)
+        echo -e "${BOLD}=== Crawl4AI Diagnostic Doctor ===${NC}"
+        echo -n "Checking Docker... "
+        if docker --version >/dev/null 2>&1; then
+            echo -e "${GREEN}✓ OK${NC}"
+        else
+            echo -e "${RED}✗ Docker not found${NC}"
+        fi
+        echo -n "Checking Docker Compose... "
+        if docker compose version >/dev/null 2>&1; then
+            echo -e "${GREEN}✓ OK${NC}"
+        else
+            echo -e "${RED}✗ Docker Compose not found${NC}"
+        fi
+        echo "Disk space:"
+        df -h . | awk 'NR==2 {print "  Available: " $4 " of " $2}'
+        echo "File permissions:"
+        for f in .env .llm.env; do
+            if [[ -f "$f" ]]; then
+                P=$(stat -c "%a" "$f" 2>/dev/null || stat -f "%Lp" "$f" 2>/dev/null || echo "unknown")
+                echo "  $f: $P (recommended: 600)"
+            else
+                echo "  $f: not found"
+            fi
+        done
+        echo -n "Port ${PORT} status: "
+        if command -v lsof &>/dev/null && lsof -i ":${PORT}" -sTCP:LISTEN -Pn &>/dev/null; then
+            echo -e "${GREEN}Listening${NC}"
+        else
+            echo -e "${YELLOW}Not listening${NC}"
+        fi
+        echo -n "Health endpoint (${BASE_URL}/health): "
+        if curl -sf "${BASE_URL}/health" >/dev/null 2>&1; then
+            echo -e "${GREEN}Healthy${NC}"
+        else
+            echo -e "${RED}Not responding${NC}"
+        fi
+        ;;
+
+    uninstall)
+        echo -e "${RED}WARNING: This will stop and remove all Crawl4AI containers and networks.${NC}"
+        read -rp "Type 'yes' to confirm: " CONFIRM
+        if [[ "$CONFIRM" == "yes" ]]; then
+            docker compose down -v
+            echo -e "${GREEN}✓ Crawl4AI containers and volumes removed.${NC}"
+        else
+            echo "Uninstall aborted."
+        fi
+        ;;
+
     help|*)
         echo -e "${BOLD}Usage:${NC} ./c4ai.sh [command]"
         echo ""
-        echo -e "  ${GREEN}start${NC}    Start Crawl4AI"
-        echo -e "  ${GREEN}stop${NC}     Stop Crawl4AI"
-        echo -e "  ${GREEN}restart${NC}  Restart Crawl4AI"
-        echo -e "  ${GREEN}status${NC}   Show container status + health"
-        echo -e "  ${GREEN}logs${NC}     Follow container logs"
-        echo -e "  ${GREEN}update${NC}   Pull latest image and restart"
-        echo -e "  ${GREEN}test${NC}     Run quick health checks"
-        echo -e "  ${GREEN}info${NC}     Show all endpoints and MCP tools"
-        echo -e "  ${GREEN}shell${NC}    Open shell in container"
+        echo -e "  ${GREEN}start${NC}      Start Crawl4AI"
+        echo -e "  ${GREEN}stop${NC}       Stop Crawl4AI"
+        echo -e "  ${GREEN}restart${NC}    Restart Crawl4AI"
+        echo -e "  ${GREEN}status${NC}     Show container status + health"
+        echo -e "  ${GREEN}logs${NC}       Follow container logs"
+        echo -e "  ${GREEN}update${NC}     Pull latest image and restart"
+        echo -e "  ${GREEN}test${NC}       Run quick health checks"
+        echo -e "  ${GREEN}info${NC}       Show all endpoints and MCP tools"
+        echo -e "  ${GREEN}shell${NC}      Open shell in container"
+        echo -e "  ${GREEN}backup${NC}     Archive configs to ./backups/"
+        echo -e "  ${GREEN}restore${NC}    Restore configs from archive"
+        echo -e "  ${GREEN}doctor${NC}     Diagnostic system check"
+        echo -e "  ${GREEN}uninstall${NC}  Remove containers and volumes"
         ;;
 esac

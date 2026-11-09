@@ -122,7 +122,7 @@ services:
     restart: always
 
   redis:
-    image: redis
+    image: redis:7-alpine
     restart: always
     command: ["--maxmemory-policy", "noeviction"]
     healthcheck:
