@@ -22,13 +22,36 @@ Automated setup script for **Postiz** — the open-source social media scheduler
 ### 🛠 Installation
 
 ```bash
-mkdir -p ~/self-hosted/postiz && cd ~/self-hosted/postiz
-curl -O https://raw.githubusercontent.com/duynghien/auto/main/postiz/setup.sh
+# Method 1: Standalone 1-liner (no git clone required)
+curl -fsSL https://raw.githubusercontent.com/duynghien/auto/main/postiz/setup.sh | bash
+
+# Method 2: Clone repository
+git clone https://github.com/duynghien/auto.git
+cd auto/postiz
 chmod +x setup.sh
 ./setup.sh
 ```
 
-The script asks for your **domain name** (e.g., `postiz.example.com`). A public HTTPS domain is required for social media OAuth callbacks to work.
+During setup, you can choose between:
+1. **Standard Lightweight Stack (Recommended)**: Postiz App + PostgreSQL + Redis (~1.5 GB RAM).
+2. **Full Enterprise Stack**: Adds Temporal + Elasticsearch 7.17 (~5 GB RAM).
+
+### 🛠 Management (`postiz` CLI)
+
+Use the helper CLI `postiz` (or `./postiz.sh`):
+
+```bash
+postiz status   # Check containers & service health
+postiz logs     # View live logs (or postiz logs <service>)
+postiz start    # Start containers
+postiz stop     # Stop containers
+postiz restart  # Restart stack
+postiz update   # Pull latest images & restart
+postiz backup   # Dump PostgreSQL database & archive config to ./backups/
+postiz restore <archive.sql.gz> # Restore database
+postiz doctor   # Run diagnostic health check
+postiz uninstall # Remove containers and data volumes
+```
 
 ### 🔌 Reverse Proxy Setup (Required)
 
@@ -230,38 +253,34 @@ Lưu file (`Ctrl+O`, `Enter`) và thoát (`Ctrl+X`).
 ./postiz.sh restart
 ```
 
-### 🛠 Quản lý
+### 🛠 Quản lý nhanh với CLI `postiz`
 
-Sử dụng script `./postiz.sh`:
+Sử dụng lệnh `postiz` (hoặc `./postiz.sh`):
+
 ```bash
-./postiz.sh status   # Xem trạng thái
-./postiz.sh logs     # Xem logs thời gian thực
-./postiz.sh restart  # Khởi động lại
-./postiz.sh update   # Cập nhật phiên bản mới
+postiz status   # Xem trạng thái containers & kiểm tra sức khỏe
+postiz logs     # Xem logs thời gian thực (hoặc postiz logs <service>)
+postiz start    # Khởi động hệ thống
+postiz stop     # Dừng hệ thống
+postiz restart  # Khởi động lại
+postiz update   # Kéo image mới nhất & cập nhật
+postiz backup   # Sao lưu cơ sở dữ liệu PostgreSQL & cấu hình vào ./backups/
+postiz restore <file.sql.gz> # Khôi phục cơ sở dữ liệu
+postiz doctor   # Kiểm tra chẩn đoán hệ thống
+postiz uninstall # Xóa sạch containers và volumes dữ liệu
 ```
 
 ### 📂 Cấu trúc thư mục
-- `.env` — Cấu hình chính + API Keys
+- `.env` — Cấu hình chính + API Keys (chmod 600)
 - `docker-compose.yml` — Cấu hình Docker
 - `dynamicconfig/` — Temporal config
-- `postiz.sh` — Script quản lý nhanh
+- `postiz.sh` — Script quản lý nhanh (symlink /usr/local/bin/postiz)
 
 ### ⚠️ Lưu ý về Tài nguyên
-Postiz yêu cầu **Temporal Stack** (gồm ElasticSearch + Postgres riêng) nên khá nặng.
-- **RAM tối thiểu**: 4GB (8GB khuyến nghị)
-- **CPU**: 2 vCPU+
+- **Bản Lightweight (Khuyến nghị)**: 1.5GB - 2GB RAM.
+- **Bản Full Temporal**: 4GB - 8GB RAM (kèm Elasticsearch 7.17).
 
 ## Troubleshooting
-
-### Error: Authentication failed (P1000) khi cài lại
-Khi cài lại mà không xóa Docker volumes, password cũ vẫn còn trong database.
-**Fix:**
-```bash
-cd ~/self-hosted/postiz
-docker compose down -v   # Xóa volumes cũ
-./setup.sh               # Cài lại
-```
-> **Lưu ý**: Script v3.0 tự động `docker compose down -v` trước khi start.
 
 ### Port 5000 bị chiếm (macOS)
 Trên macOS, AirPlay Receiver chiếm port 5000. Tắt AirPlay Receiver:

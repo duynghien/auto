@@ -43,17 +43,20 @@ chmod +x setup.sh
 ### Management
 
 ```bash
-./listmonk.sh start
-./listmonk.sh stop
-./listmonk.sh restart
-./listmonk.sh status
-./listmonk.sh logs app
-./listmonk.sh health
-./listmonk.sh backup
-./listmonk.sh db-shell
-./listmonk.sh admin
-./listmonk.sh upgrade
-./listmonk.sh reset
+./listmonk.sh start        # Start Listmonk services
+./listmonk.sh stop         # Stop services
+./listmonk.sh restart      # Restart services
+./listmonk.sh status       # Show container status
+./listmonk.sh logs [svc]   # Follow logs (default: app)
+./listmonk.sh health       # Check web health
+./listmonk.sh backup       # Backup PostgreSQL database (chmod 600) & .env to ./backups
+./listmonk.sh restore <f>  # Safe database restore with pre-restore dump
+./listmonk.sh doctor       # Diagnostics: containers, ports, PostgreSQL, disk
+./listmonk.sh db-shell     # Open PostgreSQL psql shell
+./listmonk.sh admin        # Show bootstrap admin credentials
+./listmonk.sh upgrade      # Pull latest images and restart (alias: update)
+./listmonk.sh uninstall    # Clean uninstall (keep data or full purge)
+./listmonk.sh reset        # Delete all local data volumes and uploads
 ```
 
 ### Notes
@@ -108,17 +111,20 @@ chmod +x setup.sh
 ### Quản lý
 
 ```bash
-./listmonk.sh start
-./listmonk.sh stop
-./listmonk.sh restart
-./listmonk.sh status
-./listmonk.sh logs app
-./listmonk.sh health
-./listmonk.sh backup
-./listmonk.sh db-shell
-./listmonk.sh admin
-./listmonk.sh upgrade
-./listmonk.sh reset
+./listmonk.sh start        # Khởi động dịch vụ Listmonk
+./listmonk.sh stop         # Dừng dịch vụ
+./listmonk.sh restart      # Khởi động lại
+./listmonk.sh status       # Xem trạng thái containers
+./listmonk.sh logs [svc]   # Xem logs (mặc định: app)
+./listmonk.sh health       # Kiểm tra health web
+./listmonk.sh backup       # Sao lưu PostgreSQL & .env vào ./backups
+./listmonk.sh restore <f>  # Khôi phục database an toàn kèm snapshot tự động
+./listmonk.sh doctor       # Chuẩn đoán: containers, cổng, PostgreSQL, đĩa
+./listmonk.sh db-shell     # Mở shell psql tương tác
+./listmonk.sh admin        # Hiển thị tài khoản quản trị khởi tạo
+./listmonk.sh upgrade      # Kéo images mới nhất & khởi động lại (alias: update)
+./listmonk.sh uninstall    # Gỡ cài đặt (giữ data hoặc xóa sạch)
+./listmonk.sh reset        # Xóa toàn bộ volume dữ liệu và file tải lên
 ```
 
 ### Ghi chú

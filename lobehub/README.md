@@ -61,18 +61,23 @@ The script will:
 
 ### Management
 
-After installation, use the `lobe.sh` helper:
+After installation, use the `lobe.sh` (or `lobehub.sh`) helper:
 
 ```bash
 ./lobe.sh start        # Start all services
 ./lobe.sh stop         # Stop all services
 ./lobe.sh restart      # Restart all services
-./lobe.sh upgrade      # Pull latest images & restart
+./lobe.sh upgrade      # Pull latest images & restart (alias: update)
 ./lobe.sh logs [svc]   # View logs (default: lobe)
 ./lobe.sh status       # Show container status
+./lobe.sh backup       # Safe PostgreSQL & .env backup to ./backups (chmod 600)
+./lobe.sh restore <f>  # Safe PostgreSQL restore with pre-restore backup
+./lobe.sh doctor       # Diagnostics: containers, ports, database, S3 endpoint
 ./lobe.sh search-test  # Test SearXNG search
+./lobe.sh s3-test      # Test S3 upload endpoint reachability
 ./lobe.sh secrets      # Show .env file
 ./lobe.sh s3-login     # Show S3 credentials
+./lobe.sh uninstall    # Clean uninstall (keep data or full purge)
 ./lobe.sh reset        # ⚠️ Delete all data
 ```
 
@@ -172,18 +177,23 @@ Script sẽ:
 
 ### Quản lý
 
-Sau khi cài đặt, sử dụng script `lobe.sh`:
+Sau khi cài đặt, sử dụng script `lobe.sh` (hoặc `lobehub.sh`):
 
 ```bash
 ./lobe.sh start        # Khởi động tất cả services
 ./lobe.sh stop         # Dừng tất cả services
 ./lobe.sh restart      # Khởi động lại
-./lobe.sh upgrade      # Cập nhật images mới nhất
+./lobe.sh upgrade      # Cập nhật images mới nhất (alias: update)
 ./lobe.sh logs [svc]   # Xem logs (mặc định: lobe)
 ./lobe.sh status       # Xem trạng thái containers
+./lobe.sh backup       # Sao lưu an toàn PostgreSQL & .env vào ./backups
+./lobe.sh restore <f>  # Khôi phục an toàn database kèm snapshot tự động
+./lobe.sh doctor       # Kiểm tra chuẩn đoán: containers, cổng, database, S3
 ./lobe.sh search-test  # Test tìm kiếm SearXNG
+./lobe.sh s3-test      # Test kết nối upload S3
 ./lobe.sh secrets      # Xem file .env
 ./lobe.sh s3-login     # Xem thông tin S3
+./lobe.sh uninstall    # Gỡ cài đặt (giữ data hoặc xóa sạch)
 ./lobe.sh reset        # ⚠️ Xóa toàn bộ dữ liệu
 ```
 

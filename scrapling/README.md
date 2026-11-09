@@ -63,11 +63,24 @@ docker run --rm -v "$(pwd)/data:/data" scrapling:latest \
 
 > **Note**: Containers run with `--rm` (one-shot, auto-removed). They won't show in OrbStack after completing — this is expected.
 
-### 🤖 MCP Integration (AI Agents)
+### 🛠️ Management CLI (`./scrapling.sh`)
+
+Navigate to your install directory (`cd ~/self-hosted/scrapling`) to manage the stack:
 
 ```bash
-# Start MCP Server
-docker compose --profile mcp up -d
+./scrapling.sh status                          # View MCP server status and endpoint
+./scrapling.sh start                           # Start MCP server in background
+./scrapling.sh stop                            # Stop MCP server
+./scrapling.sh restart                         # Restart MCP server
+./scrapling.sh logs                            # Follow MCP server logs
+./scrapling.sh scrape get <url> <output>       # Fast HTTP stealth scrape
+./scrapling.sh scrape fetch <url> <output>     # Playwright headless browser scrape
+./scrapling.sh scrape stealthy-fetch <url> <o> # Maximum bot evasion scrape
+./scrapling.sh update                          # Rebuild Scrapling Docker image
+./scrapling.sh backup                          # Snapshot configs and ./data to ./backups/ (chmod 700)
+./scrapling.sh restore <f>                     # Verify integrity (gzip -t), snapshot, and restore
+./scrapling.sh doctor                          # Check Docker, ports, disk, and permissions
+./scrapling.sh uninstall                       # Safely remove containers and optional image
 ```
 
 - **MCP URL**: `http://localhost:8000/mcp`
@@ -147,11 +160,24 @@ docker run --rm -v "$(pwd)/data:/data" scrapling:latest \
 
 > **Lưu ý**: Container chạy với `--rm` (dùng một lần, tự xóa sau khi xong). Sẽ không hiển thị trong OrbStack sau khi hoàn thành — đây là hành vi bình thường.
 
-### 🤖 Tích hợp AI Agent (MCP)
+### 🛠️ Lệnh Quản Lý (`./scrapling.sh`)
+
+Di chuyển vào thư mục cài đặt (`cd ~/self-hosted/scrapling`):
 
 ```bash
-# Khởi động MCP Server
-docker compose --profile mcp up -d
+./scrapling.sh status                          # Kiểm tra trạng thái MCP server và cổng kết nối
+./scrapling.sh start                           # Khởi động MCP server chạy nền
+./scrapling.sh stop                            # Dừng MCP server
+./scrapling.sh restart                         # Khởi động lại
+./scrapling.sh logs                            # Xem log MCP server
+./scrapling.sh scrape get <url> <output>       # Cào dữ liệu nhanh bằng HTTP stealth
+./scrapling.sh scrape fetch <url> <output>     # Cào trang dùng JavaScript bằng Playwright
+./scrapling.sh scrape stealthy-fetch <url> <o> # Cào vượt bot tối đa
+./scrapling.sh update                          # Rebuild lại image Scrapling mới nhất
+./scrapling.sh backup                          # Sao lưu cấu hình và dữ liệu ./data vào ./backups/ (phân quyền an toàn)
+./scrapling.sh restore <f>                     # Kiểm tra file backup, tạo snapshot an toàn rồi khôi phục
+./scrapling.sh doctor                          # Chẩn đoán trạng thái Docker, ổ đĩa, cổng và quyền file
+./scrapling.sh uninstall                       # Gỡ cài đặt và dọn dẹp an toàn
 ```
 
 - **MCP URL**: `http://localhost:8000/mcp`

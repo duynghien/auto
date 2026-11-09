@@ -58,15 +58,18 @@ The script will:
 After installation, use `matomo.sh`:
 
 ```bash
-./matomo.sh start        # Start/upgrade stack
+./matomo.sh start        # Start Matomo stack
 ./matomo.sh stop         # Stop services
 ./matomo.sh restart      # Restart services
 ./matomo.sh status       # Show container status
 ./matomo.sh logs [svc]   # Follow logs (default: matomo)
 ./matomo.sh health       # Check web health endpoint
-./matomo.sh backup       # Backup MariaDB to .sql file
-./matomo.sh upgrade      # Pull latest images and restart
-./matomo.sh reset        # ⚠️ Delete all local data volumes
+./matomo.sh backup       # Backup MariaDB database (chmod 600) & .env to ./backups
+./matomo.sh restore <f>  # Safe database restore with pre-restore dump
+./matomo.sh doctor       # Diagnostics: containers, ports, MariaDB, disk
+./matomo.sh upgrade      # Pull latest images and restart (alias: update)
+./matomo.sh uninstall    # Clean uninstall (keep data or full purge)
+./matomo.sh reset        # Delete all local data volumes
 ```
 
 ### Configuration
@@ -165,15 +168,18 @@ Script sẽ:
 Sau khi cài đặt, dùng `matomo.sh`:
 
 ```bash
-./matomo.sh start        # Khởi động/cập nhật stack
+./matomo.sh start        # Khởi động dịch vụ Matomo
 ./matomo.sh stop         # Dừng services
 ./matomo.sh restart      # Khởi động lại
-./matomo.sh status       # Xem trạng thái container
+./matomo.sh status       # Xem trạng thái containers
 ./matomo.sh logs [svc]   # Theo dõi logs (mặc định: matomo)
-./matomo.sh health       # Kiểm tra web health endpoint
-./matomo.sh backup       # Backup MariaDB ra file .sql
-./matomo.sh upgrade      # Pull image mới nhất và restart
-./matomo.sh reset        # ⚠️ Xóa toàn bộ volume dữ liệu
+./matomo.sh health       # Kiểm tra endpoint web health
+./matomo.sh backup       # Sao lưu MariaDB & .env vào ./backups (chmod 600)
+./matomo.sh restore <f>  # Khôi phục database an toàn kèm snapshot tự động
+./matomo.sh doctor       # Chuẩn đoán: containers, cổng, MariaDB, đĩa
+./matomo.sh upgrade      # Kéo images mới nhất & khởi động lại (alias: update)
+./matomo.sh uninstall    # Gỡ cài đặt (giữ data hoặc xóa sạch)
+./matomo.sh reset        # Xóa toàn bộ volume dữ liệu
 ```
 
 ### Cấu hình

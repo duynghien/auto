@@ -45,15 +45,19 @@ chmod +x setup.sh
 ### Management
 
 ```bash
-./hog.sh start
-./hog.sh start-full
-./hog.sh stop
-./hog.sh restart
-./hog.sh status
-./hog.sh logs web
-./hog.sh health
-./hog.sh upgrade
-./hog.sh reset
+./hog.sh start        # Start default hobby stack (alias: ./posthog.sh)
+./hog.sh start-full   # Start with optional profiles (temporal + exceptions)
+./hog.sh stop         # Stop all services
+./hog.sh restart      # Restart services with preflight patches
+./hog.sh status       # Show container status
+./hog.sh logs [svc]   # Follow service logs (default: web)
+./hog.sh health       # Check /_health endpoint
+./hog.sh backup       # Backup PostgreSQL database (service db) & .env (chmod 600)
+./hog.sh restore <f>  # Safe restore PostgreSQL with safety pre-dump
+./hog.sh doctor       # Diagnostics: containers, ports, db, clickhouse, disk
+./hog.sh upgrade      # Pull latest source & update containers (alias: update)
+./hog.sh uninstall    # Clean uninstall (keep data or full purge)
+./hog.sh reset        # Delete all local data volumes
 ```
 
 ### Notes
@@ -115,15 +119,19 @@ chmod +x setup.sh
 ### Quản lý
 
 ```bash
-./hog.sh start
-./hog.sh start-full
-./hog.sh stop
-./hog.sh restart
-./hog.sh status
-./hog.sh logs web
-./hog.sh health
-./hog.sh upgrade
-./hog.sh reset
+./hog.sh start        # Khởi động hobby stack mặc định (alias: ./posthog.sh)
+./hog.sh start-full   # Khởi động kèm profile phụ (temporal + exceptions)
+./hog.sh stop         # Dừng toàn bộ services
+./hog.sh restart      # Khởi động lại kèm patch preflight
+./hog.sh status       # Xem trạng thái containers
+./hog.sh logs [svc]   # Xem logs service (mặc định: web)
+./hog.sh health       # Kiểm tra endpoint /_health
+./hog.sh backup       # Sao lưu PostgreSQL database (service db) & .env vào ./backups
+./hog.sh restore <f>  # Khôi phục an toàn database kèm snapshot tự động
+./hog.sh doctor       # Chuẩn đoán: containers, cổng, PostgreSQL, ClickHouse, đĩa
+./hog.sh upgrade      # Cập nhật mã nguồn & containers (alias: update)
+./hog.sh uninstall    # Gỡ cài đặt (giữ data hoặc xóa sạch)
+./hog.sh reset        # Xóa toàn bộ volume dữ liệu
 ```
 
 ### Ghi chú

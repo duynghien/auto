@@ -52,17 +52,20 @@ chmod +x setup.sh
 ### Management
 
 ```bash
-./espocrm.sh start
-./espocrm.sh stop
-./espocrm.sh restart
-./espocrm.sh status
-./espocrm.sh logs app
-./espocrm.sh health
-./espocrm.sh backup
-./espocrm.sh db-shell
-./espocrm.sh admin
-./espocrm.sh upgrade
-./espocrm.sh reset
+./espocrm.sh start        # Start EspoCRM services
+./espocrm.sh stop         # Stop services
+./espocrm.sh restart      # Restart services
+./espocrm.sh status       # Show container status
+./espocrm.sh logs [svc]   # Follow logs (default: app)
+./espocrm.sh health       # Check web, db and websocket ports
+./espocrm.sh backup       # Backup MariaDB database (chmod 600) & .env to ./backups
+./espocrm.sh restore <f>  # Safe database restore with pre-restore dump
+./espocrm.sh doctor       # Diagnostics: containers, ports, MariaDB, disk
+./espocrm.sh db-shell     # Open MariaDB interactive shell
+./espocrm.sh admin        # Show bootstrap admin credentials
+./espocrm.sh upgrade      # Pull latest images and restart (alias: update)
+./espocrm.sh uninstall    # Clean uninstall (keep data or full purge)
+./espocrm.sh reset        # Delete all local data volumes
 ```
 
 ### Notes
@@ -126,17 +129,20 @@ chmod +x setup.sh
 ### Quản lý
 
 ```bash
-./espocrm.sh start
-./espocrm.sh stop
-./espocrm.sh restart
-./espocrm.sh status
-./espocrm.sh logs app
-./espocrm.sh health
-./espocrm.sh backup
-./espocrm.sh db-shell
-./espocrm.sh admin
-./espocrm.sh upgrade
-./espocrm.sh reset
+./espocrm.sh start        # Khởi động dịch vụ EspoCRM
+./espocrm.sh stop         # Dừng dịch vụ
+./espocrm.sh restart      # Khởi động lại
+./espocrm.sh status       # Xem trạng thái containers
+./espocrm.sh logs [svc]   # Xem logs (mặc định: app)
+./espocrm.sh health       # Kiểm tra cổng web, database và websocket
+./espocrm.sh backup       # Sao lưu cơ sở dữ liệu MariaDB & .env vào ./backups
+./espocrm.sh restore <f>  # Khôi phục database an toàn kèm snapshot tự động
+./espocrm.sh doctor       # Chuẩn đoán: containers, cổng, MariaDB, đĩa
+./espocrm.sh db-shell     # Mở shell tương tác MariaDB
+./espocrm.sh admin        # Hiển thị tài khoản quản trị khởi tạo
+./espocrm.sh upgrade      # Kéo images mới nhất & khởi động lại (alias: update)
+./espocrm.sh uninstall    # Gỡ cài đặt (giữ data hoặc xóa sạch)
+./espocrm.sh reset        # Xóa toàn bộ volume dữ liệu
 ```
 
 ### Ghi chú

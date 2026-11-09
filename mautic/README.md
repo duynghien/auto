@@ -18,12 +18,30 @@ Automated setup script for **Mautic 7** (Open Source Marketing Automation) using
 ### Quick Install
 
 ```bash
-# Create directory & download script
-mkdir -p ~/self-hosted/mautic && cd ~/self-hosted/mautic
-curl -O https://raw.githubusercontent.com/duynghien/auto/main/mautic/setup.sh
+# Method 1: Standalone 1-liner
+curl -fsSL https://raw.githubusercontent.com/duynghien/auto/main/mautic/setup.sh | bash
 
-# Run installer
+# Method 2: Clone repository
+git clone https://github.com/duynghien/auto.git
+cd auto/mautic
 chmod +x setup.sh && ./setup.sh
+```
+
+### Management (`mautic` CLI)
+
+Use the helper CLI `mautic` (or `./mautic.sh`):
+
+```bash
+mautic status   # Show container status and health diagnostics
+mautic logs     # View live logs (or mautic logs <service>)
+mautic start    # Start containers
+mautic stop     # Stop containers
+mautic restart  # Restart stack
+mautic update   # Pull latest images and restart
+mautic backup   # Dump MariaDB database and archive configurations
+mautic restore <archive.sql.gz> # Safely restore database
+mautic doctor   # Run diagnostic health check
+mautic uninstall # Stop and remove containers and data volumes
 ```
 
 ### Access
@@ -58,12 +76,28 @@ Script cài đặt tự động **Mautic 7** (Marketing Automation) tối ưu ch
 ### Cài đặt nhanh
 
 ```bash
-# Tạo thư mục và tải script
-mkdir -p ~/self-hosted/mautic && cd ~/self-hosted/mautic
-curl -O https://raw.githubusercontent.com/duynghien/auto/main/mautic/setup.sh
+# Cách 1: Cài đặt nhanh 1 dòng lệnh (Standalone)
+curl -fsSL https://raw.githubusercontent.com/duynghien/auto/main/mautic/setup.sh | bash
 
-# Chạy script
+# Cách 2: Clone repository
+git clone https://github.com/duynghien/auto.git
+cd auto/mautic
 chmod +x setup.sh && ./setup.sh
+```
+
+### Quản lý nhanh với CLI `mautic`
+
+```bash
+mautic status   # Kiểm tra trạng thái containers và sức khỏe dịch vụ
+mautic logs     # Xem logs (hoặc mautic logs <service>)
+mautic start    # Khởi động hệ thống
+mautic stop     # Dừng hệ thống
+mautic restart  # Khởi động lại
+mautic update   # Kéo image mới nhất và restart
+mautic backup   # Sao lưu cơ sở dữ liệu MariaDB và cấu hình
+mautic restore <file.sql.gz> # Khôi phục cơ sở dữ liệu
+mautic doctor   # Kiểm tra chẩn đoán hệ thống
+mautic uninstall # Xóa containers và dữ liệu
 ```
 
 ### Hướng Dẫn Sử Dụng

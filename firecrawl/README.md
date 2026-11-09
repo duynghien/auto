@@ -24,6 +24,10 @@ Automated Docker setup for **FireCrawl** — a powerful, open-source web scrapin
 ### 🛠️ Installation
 
 ```bash
+# Method 1: Standalone 1-liner (no git clone required)
+curl -fsSL https://raw.githubusercontent.com/duynghien/auto/main/firecrawl/setup.sh | bash
+
+# Method 2: Clone repository
 mkdir -p ~/self-hosted
 cd ~/self-hosted
 git clone https://github.com/duynghien/auto.git && cd auto/firecrawl
@@ -31,41 +35,20 @@ git clone https://github.com/duynghien/auto.git && cd auto/firecrawl
 chmod +x setup.sh && ./setup.sh
 ```
 
-### 🔧 Usage
+### 🔧 Management (`fc` or `firecrawl`)
 
 ```bash
-# Health check
-curl http://localhost:3002/v1/health
-
-# Scrape a URL → Markdown
-curl -X POST http://localhost:3002/v1/scrape \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://example.com", "formats": ["markdown"]}'
-
-# Scrape → structured JSON with AI
-curl -X POST http://localhost:3002/v1/scrape \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://example.com", "formats": ["extract"], "actions": [{"type": "wait", "milliseconds": 2000}]}'
-
-# Crawl an entire site
-curl -X POST http://localhost:3002/v1/crawl \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://example.com", "limit": 10, "formats": ["markdown"]}'
-```
-
-### 🗺️ Access URLs
-- **FireCrawl API**: [http://localhost:3002](http://localhost:3002)
-- **Queue Admin**: [http://localhost:3002/admin/queues](http://localhost:3002/admin/queues)
-
-### 🔧 Management
-
-```bash
-./fc.sh start    # Start all containers
-./fc.sh stop     # Stop all containers
-./fc.sh logs     # Follow API logs
-./fc.sh status   # Show status + health check
-./fc.sh test     # Run a test scrape
-./fc.sh update   # Pull latest source & rebuild
+fc start    # Start all containers
+fc stop     # Stop all containers
+fc restart  # Restart all containers
+fc logs     # Follow API logs (or fc logs <service>)
+fc status   # Show status + health check diagnostics
+fc test     # Run a test scrape
+fc update   # Pull latest source & rebuild
+fc backup   # Dump PostgreSQL (nuq) and archive config
+fc restore <archive.sql.gz> # Restore database
+fc doctor   # Diagnostic system check
+fc uninstall # Remove containers and volumes
 ```
 
 ---
@@ -90,11 +73,31 @@ Bộ cài đặt Docker tự động cho **FireCrawl** — nền tảng web scra
 ### 🛠️ Hướng dẫn cài đặt
 
 ```bash
+# Cách 1: Cài đặt nhanh 1 dòng lệnh (Standalone không cần clone repo)
+curl -fsSL https://raw.githubusercontent.com/duynghien/auto/main/firecrawl/setup.sh | bash
+
+# Cách 2: Clone repository
 mkdir -p ~/self-hosted
 cd ~/self-hosted
 git clone https://github.com/duynghien/auto.git && cd auto/firecrawl
 
 chmod +x setup.sh && ./setup.sh
+```
+
+### 🔧 Quản lý nhanh với CLI `fc`
+
+```bash
+fc start    # Khởi động containers
+fc stop     # Dừng containers
+fc restart  # Khởi động lại
+fc logs     # Xem logs (hoặc fc logs <service>)
+fc status   # Xem trạng thái containers & sức khỏe dịch vụ
+fc test     # Chạy thử lệnh scrape
+fc update   # Kéo mã nguồn mới nhất & build lại
+fc backup   # Sao lưu PostgreSQL (nuq) và cấu hình
+fc restore <file.sql.gz> # Khôi phục cơ sở dữ liệu
+fc doctor   # Kiểm tra chẩn đoán hệ thống
+fc uninstall # Xóa sạch containers và dữ liệu
 ```
 
 ### 🗺️ Địa chỉ truy cập

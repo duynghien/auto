@@ -45,19 +45,21 @@ Once installed:
 - **Spacebot UI**: [http://localhost:19898](http://localhost:19898) (Open in browser to complete onboarding)
 - Data is stored locally in `./data` mapping to `/data` in the container.
 
-### ⚙️ Management
+### ⚙️ Management CLI (`./spacebot.sh`)
+
+Navigate to your install directory (`cd ~/self-hosted/spacebot`) to manage the stack:
+
 ```bash
-# Start
-docker compose up -d
-
-# Stop
-docker compose stop
-
-# View Logs
-docker compose logs -f spacebot
-
-# Update Spacebot
-docker compose pull && docker compose up -d
+./spacebot.sh status      # View container health, active ports, and URLs
+./spacebot.sh start       # Start Spacebot container
+./spacebot.sh stop        # Stop Spacebot container
+./spacebot.sh restart     # Restart Spacebot container
+./spacebot.sh logs        # Follow container logs
+./spacebot.sh update      # Pull latest image and restart
+./spacebot.sh backup      # Archive configs and data volume snapshot to ./backups/ (chmod 700)
+./spacebot.sh restore <f> # Verify integrity (gzip -t), take safety snapshot, and restore
+./spacebot.sh doctor      # Diagnostic check on Docker, disk, ports, and permissions
+./spacebot.sh uninstall   # Safely stop and remove containers
 ```
 
 ---
@@ -103,19 +105,21 @@ Sau khi cài đặt xong:
 - **Giao diện Spacebot**: [http://localhost:19898](http://localhost:19898) (Mở trên trình duyệt để hoàn tất thiết lập ban đầu)
 - Dữ liệu được lưu trữ cố định ở thư mục `./data` trên máy chủ.
 
-### ⚙️ Quản lý
+### ⚙️ Lệnh Quản Lý (`./spacebot.sh`)
+
+Di chuyển vào thư mục cài đặt (`cd ~/self-hosted/spacebot`):
+
 ```bash
-# Bật
-docker compose up -d
-
-# Tắt
-docker compose stop
-
-# Xem Logs
-docker compose logs -f spacebot
-
-# Cập nhật Spacebot
-docker compose pull && docker compose up -d
+./spacebot.sh status      # Kiểm tra trạng thái container và cổng kết nối
+./spacebot.sh start       # Khởi động dịch vụ
+./spacebot.sh stop        # Dừng dịch vụ
+./spacebot.sh restart     # Khởi động lại
+./spacebot.sh logs        # Xem log thời gian thực
+./spacebot.sh update      # Kéo image mới nhất và khởi động lại
+./spacebot.sh backup      # Sao lưu cấu hình và dữ liệu ./data vào ./backups/ (phân quyền an toàn)
+./spacebot.sh restore <f> # Kiểm tra file backup, tạo snapshot an toàn rồi khôi phục
+./spacebot.sh doctor      # Chẩn đoán trạng thái Docker, ổ đĩa, cổng và quyền file
+./spacebot.sh uninstall   # Gỡ cài đặt và dọn dẹp an toàn
 ```
 
 ---

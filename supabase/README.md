@@ -61,15 +61,19 @@ chmod +x setup.sh
 ### Management
 
 ```bash
-./supa.sh start
-./supa.sh stop
-./supa.sh restart
-./supa.sh status
-./supa.sh logs kong
-./supa.sh health
-./supa.sh keys
-./supa.sh upgrade
-./supa.sh reset
+./supa.sh start        # Start Supabase stack (alias: ./supabase.sh)
+./supa.sh stop         # Stop all services
+./supa.sh restart      # Restart services (force-recreate)
+./supa.sh status       # Show container status
+./supa.sh logs [svc]   # Follow service logs (default: kong)
+./supa.sh health       # Verify all service endpoints & health
+./supa.sh backup       # Backup PostgreSQL database (service db) & .env (chmod 600)
+./supa.sh restore <f>  # Safe restore PostgreSQL with safety pre-dump
+./supa.sh doctor       # Diagnostics: status, port, health, db, disk
+./supa.sh keys         # Display API keys & credentials
+./supa.sh upgrade      # Pull latest containers & restart (alias: update)
+./supa.sh uninstall    # Clean uninstall (keep data or full purge)
+./supa.sh reset        # Delete all local data volumes
 ```
 
 ### Notes
@@ -150,15 +154,19 @@ chmod +x setup.sh
 ### Quản lý
 
 ```bash
-./supa.sh start
-./supa.sh stop
-./supa.sh restart
-./supa.sh status
-./supa.sh logs kong
-./supa.sh health
-./supa.sh keys
-./supa.sh upgrade
-./supa.sh reset
+./supa.sh start        # Khởi động Supabase stack (alias: ./supabase.sh)
+./supa.sh stop         # Dừng toàn bộ services
+./supa.sh restart      # Khởi động lại services
+./supa.sh status       # Xem trạng thái containers
+./supa.sh logs [svc]   # Xem logs service (mặc định: kong)
+./supa.sh health       # Kiểm tra toàn bộ endpoint & health
+./supa.sh backup       # Sao lưu PostgreSQL database (service db) & .env vào ./backups
+./supa.sh restore <f>  # Khôi phục an toàn database kèm snapshot tự động
+./supa.sh doctor       # Chuẩn đoán: containers, cổng, health, PostgreSQL, đĩa
+./supa.sh keys         # Hiển thị API keys & tài khoản quản trị
+./supa.sh upgrade      # Cập nhật images & khởi động lại (alias: update)
+./supa.sh uninstall    # Gỡ cài đặt (giữ data hoặc xóa sạch)
+./supa.sh reset        # Xóa toàn bộ volume dữ liệu
 ```
 
 ### Ghi chú

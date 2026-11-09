@@ -30,11 +30,23 @@ chmod +x setup.sh
 
 **Note**: The script will automatically install everything into `~/self-hosted/proxies`, regardless of where you run it from.
 
-### Features
-- **OS Detection**: Auto-installs Docker on Linux/Pi if missing.
-- **Interactive Menu**: Choose your preferred proxy.
-- **Dynamic Config**: Generates `docker-compose.yml` based on selection.
-- **Network Ready**: Creates a `proxy-network` for other containers to join.
+### Management CLI (`./proxies.sh`)
+
+Navigate to your install directory (`cd ~/self-hosted/proxies`) to manage the proxy stack:
+
+```bash
+./proxies.sh status      # View running proxy containers and active ports
+./proxies.sh start       # Start proxy containers
+./proxies.sh stop        # Stop proxy containers
+./proxies.sh restart     # Restart proxy containers
+./proxies.sh reload      # Hot-reload Caddyfile or restart proxy
+./proxies.sh logs        # Follow container logs
+./proxies.sh update      # Pull latest container images and restart
+./proxies.sh backup      # Archive configs, certificates and .env to ./backups/ (chmod 700)
+./proxies.sh restore <f> # Verify archive integrity (gzip -t), snapshot, and restore
+./proxies.sh doctor      # Diagnostic check on Docker, ports 80/443/81, and permissions
+./proxies.sh uninstall   # Safely stop and remove containers
+```
 
 ### Connecting Other Services
 
@@ -82,11 +94,23 @@ chmod +x setup.sh
 
 **Lưu ý**: Script sẽ tự động cài đặt mọi thứ vào thư mục `~/self-hosted/proxies`, bất kể bạn chạy script từ đâu.
 
-### Tính năng
-- **Tự nhận diện OS**: Tự cài Docker trên Linux/Pi nếu chưa có.
-- **Menu lựa chọn**: Chọn loại proxy bạn muốn dùng.
-- **Cấu hình động**: Tự tạo `docker-compose.yml` theo lựa chọn.
-- **Mạng Proxy**: Tạo sẵn `proxy-network` để các container khác kết nối vào.
+### Lệnh Quản Lý (`./proxies.sh`)
+
+Di chuyển vào thư mục cài đặt (`cd ~/self-hosted/proxies`):
+
+```bash
+./proxies.sh status      # Kiểm tra trạng thái container và cổng kết nối
+./proxies.sh start       # Khởi động dịch vụ proxy
+./proxies.sh stop        # Dừng dịch vụ proxy
+./proxies.sh restart     # Khởi động lại dịch vụ
+./proxies.sh reload      # Tải lại cấu hình Caddyfile không gián đoạn hoặc restart
+./proxies.sh logs        # Xem log thời gian thực
+./proxies.sh update      # Cập nhật image mới nhất
+./proxies.sh backup      # Sao lưu cấu hình và chứng chỉ SSL vào ./backups/ (phân quyền an toàn)
+./proxies.sh restore <f> # Kiểm tra file backup, tạo snapshot an toàn rồi khôi phục
+./proxies.sh doctor      # Chẩn đoán trạng thái Docker, cổng 80/443/81 và quyền file
+./proxies.sh uninstall   # Gỡ cài đặt và dọn dẹp an toàn
+```
 
 ### Hướng dẫn kết nối
 

@@ -112,8 +112,11 @@ openclaw logs         # View all logs (live)
 openclaw logs n8n     # View n8n logs only
 openclaw restart      # Restart all services
 openclaw restart n8n  # Restart specific service
-openclaw backup       # Run manual backup
+openclaw backup       # Run manual backup (Postgres + n8n + configs)
+openclaw restore <f>  # Restore database from sql.gz backup
+openclaw doctor       # Run diagnostic health checks
 openclaw update       # Pull latest images
+openclaw uninstall    # Soft or complete uninstall
 openclaw features     # View feature toggles
 openclaw env          # View environment (values hidden)
 ```
@@ -236,8 +239,11 @@ openclaw logs         # Xem logs (realtime)
 openclaw logs n8n     # Xem logs n8n
 openclaw restart      # Restart tất cả
 openclaw restart n8n  # Restart dịch vụ cụ thể
-openclaw backup       # Backup thủ công
+openclaw backup       # Backup thủ công (Postgres + n8n + configs)
+openclaw restore <f>  # Khôi phục cơ sở dữ liệu từ file backup
+openclaw doctor       # Kiểm tra chẩn đoán hệ thống
 openclaw update       # Cập nhật images
+openclaw uninstall    # Gỡ bỏ an toàn hoặc xóa toàn bộ
 openclaw features     # Xem feature toggles
 openclaw env          # Xem environment (ẩn giá trị)
 ```

@@ -48,16 +48,20 @@ chmod +x setup.sh
 ### Management
 
 ```bash
-./prometheus.sh start
-./prometheus.sh stop
-./prometheus.sh restart
-./prometheus.sh status
-./prometheus.sh logs prometheus
-./prometheus.sh health
-./prometheus.sh reload
-./prometheus.sh config-check
-./prometheus.sh upgrade
-./prometheus.sh reset
+./prometheus.sh start         # Start/upgrade stack
+./prometheus.sh stop          # Stop services
+./prometheus.sh restart       # Restart services
+./prometheus.sh status        # Show service status
+./prometheus.sh logs [svc]    # Follow logs (default: prometheus)
+./prometheus.sh health        # Check /-/healthy and /-/ready
+./prometheus.sh backup        # Backup config & TSDB volume to ./backups
+./prometheus.sh restore <f>   # Safe restore configuration from backup
+./prometheus.sh doctor        # Diagnostics: containers, ports, health, promtool
+./prometheus.sh reload        # Reload prometheus.yml without restart
+./prometheus.sh config-check  # Validate prometheus.yml via promtool
+./prometheus.sh upgrade       # Pull latest images and restart (alias: update)
+./prometheus.sh uninstall     # Clean uninstall (keep data or full purge)
+./prometheus.sh reset         # Delete Prometheus data volume
 ```
 
 ### Files Generated
@@ -141,16 +145,20 @@ chmod +x setup.sh
 ### Quản lý
 
 ```bash
-./prometheus.sh start
-./prometheus.sh stop
-./prometheus.sh restart
-./prometheus.sh status
-./prometheus.sh logs prometheus
-./prometheus.sh health
-./prometheus.sh reload
-./prometheus.sh config-check
-./prometheus.sh upgrade
-./prometheus.sh reset
+./prometheus.sh start         # Khởi động/cập nhật stack
+./prometheus.sh stop          # Dừng services
+./prometheus.sh restart       # Khởi động lại
+./prometheus.sh status        # Xem trạng thái services
+./prometheus.sh logs [svc]    # Xem logs (mặc định: prometheus)
+./prometheus.sh health        # Kiểm tra /-/healthy và /-/ready
+./prometheus.sh backup        # Sao lưu cấu hình & volume TSDB vào ./backups
+./prometheus.sh restore <f>   # Khôi phục cấu hình an toàn từ file backup
+./prometheus.sh doctor        # Chuẩn đoán: containers, cổng, health, promtool
+./prometheus.sh reload        # Tải lại prometheus.yml không cần khởi động lại
+./prometheus.sh config-check  # Kiểm tra tính hợp lệ prometheus.yml bằng promtool
+./prometheus.sh upgrade       # Kéo images mới nhất & khởi động lại (alias: update)
+./prometheus.sh uninstall     # Gỡ cài đặt (giữ data hoặc xóa sạch)
+./prometheus.sh reset         # Xóa volume dữ liệu Prometheus
 ```
 
 ### Các file được tạo

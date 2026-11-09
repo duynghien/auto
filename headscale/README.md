@@ -14,13 +14,17 @@ One-script installer for Headscale (self-hosted Tailscale control server) with H
 | **Headscale** | Tailscale control server |
 | **Headscale-UI** | Web-based dashboard for managing networks/users |
 ### Quick Install
+
 ```bash
-# Create directory and download script
-mkdir -p ~/self-hosted/headscale && cd ~/self-hosted/headscale
-curl -O https://raw.githubusercontent.com/duynghien/auto/main/headscale/setup.sh
-# Run setup
-chmod +x setup.sh
-./setup.sh
+# Method 1: Standalone 1-liner
+curl -fsSL https://raw.githubusercontent.com/duynghien/auto/main/headscale/setup.sh | bash
+
+# Method 2: Clone repository
+mkdir -p ~/self-hosted
+cd ~/self-hosted
+git clone https://github.com/duynghien/auto.git
+cd auto/headscale
+chmod +x setup.sh && ./setup.sh
 ```
 The script will:
 1. Detect your OS and architecture

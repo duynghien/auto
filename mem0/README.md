@@ -33,33 +33,32 @@ Automated setup for **macOS (Apple Silicon)**, **Raspberry Pi**, and **Linux VPS
 ### 🛠️ Installation
 
 ```bash
-# Clone the repository
+# Method 1: Standalone 1-liner (no git clone required)
+curl -fsSL https://raw.githubusercontent.com/duynghien/auto/main/mem0/setup.sh | bash
+
+# Method 2: Clone repository
 mkdir -p ~/self-hosted
 cd ~/self-hosted
 git clone https://github.com/duynghien/auto.git
 cd auto/mem0
-
-# Run unified setup (detects OS automatically)
 chmod +x setup.sh mem0.sh
 ./setup.sh
 ```
 
-> **Note:** The script automatically installs `qdrant-client` + `neo4j` driver, configures graph memory, and seeds config via API.
-
-### 📦 Management
-
-Use the helper script:
+### 📦 Management (`mem0` CLI)
 
 ```bash
-./mem0.sh start    # Start containers
-./mem0.sh stop     # Stop containers
-./mem0.sh restart  # Restart
-./mem0.sh status   # Health check (API + Qdrant + Neo4j + UI + packages)
-./mem0.sh logs     # View all logs
-./mem0.sh logs openmemory-mcp  # View API logs only
-./mem0.sh test     # Smoke test (add memory)
-./mem0.sh update   # Pull latest image & rebuild
-./mem0.sh purge    # ⚠️ Remove ALL containers + volumes (deletes all data)
+mem0 start    # Start containers
+mem0 stop     # Stop containers
+mem0 restart  # Restart stack
+mem0 status   # Health check (API + Qdrant + Neo4j + UI + packages)
+mem0 logs     # View all logs (or mem0 logs <service>)
+mem0 test     # Smoke test (add memory)
+mem0 update   # Pull latest source & rebuild
+mem0 backup   # Archive configurations to ./backups/
+mem0 restore <archive.tar.gz> # Restore configurations from archive
+mem0 doctor   # Diagnostic system check
+mem0 uninstall # Remove all containers and data volumes
 ```
 
 ### 🗺️ Access URLs
@@ -139,33 +138,32 @@ Hỗ trợ cài đặt tự động trên **macOS (Apple Silicon)**, **Raspberry
 ### 🛠️ Hướng dẫn cài đặt
 
 ```bash
-# Tải mã nguồn
+# Cách 1: Cài đặt nhanh 1 dòng lệnh (Standalone không cần clone repo)
+curl -fsSL https://raw.githubusercontent.com/duynghien/auto/main/mem0/setup.sh | bash
+
+# Cách 2: Clone repository
 mkdir -p ~/self-hosted
 cd ~/self-hosted
 git clone https://github.com/duynghien/auto.git
 cd auto/mem0
-
-# Chạy script cài đặt (tự nhận diện OS)
 chmod +x setup.sh mem0.sh
 ./setup.sh
 ```
 
-> **Lưu ý:** Script sẽ tự động cài `qdrant-client` + `neo4j` driver, cấu hình graph memory và seed config thông qua API.
-
-### 📦 Quản lý
-
-Sử dụng script hỗ trợ sau:
+### 📦 Quản lý nhanh với CLI `mem0`
 
 ```bash
-./mem0.sh start    # Khởi động dịch vụ
-./mem0.sh stop     # Dừng dịch vụ
-./mem0.sh restart  # Khởi động lại
-./mem0.sh status   # Kiểm tra sức khỏe (API + Qdrant + Neo4j + UI + packages)
-./mem0.sh logs     # Xem toàn bộ logs
-./mem0.sh logs openmemory-mcp  # Xem log của API
-./mem0.sh test     # Chạy test cơ bản (thêm memory)
-./mem0.sh update   # Cập nhật image mới nhất & khởi tạo lại
-./mem0.sh purge    # ⚠️ Xóa TOÀN BỘ container + volumes (xóa mọi dữ liệu)
+mem0 start    # Khởi động dịch vụ
+mem0 stop     # Dừng dịch vụ
+mem0 restart  # Khởi động lại
+mem0 status   # Kiểm tra sức khỏe (API + Qdrant + Neo4j + UI + packages)
+mem0 logs     # Xem toàn bộ logs (hoặc mem0 logs <tên_service>)
+mem0 test     # Chạy test cơ bản (thêm memory)
+mem0 update   # Cập nhật mã nguồn mới nhất & build lại
+mem0 backup   # Sao lưu cấu hình vào ./backups/
+mem0 restore <file.tar.gz> # Khôi phục cấu hình
+mem0 doctor   # Kiểm tra chẩn đoán hệ thống
+mem0 uninstall # Xóa toàn bộ container và volumes dữ liệu
 ```
 
 ### 🗺️ Địa chỉ truy cập

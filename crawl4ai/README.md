@@ -58,38 +58,36 @@ Automated setup for **macOS (Apple Silicon)**, **Raspberry Pi**, and **Linux VPS
 ### 🛠️ Installation
 
 ```bash
-# Clone the repository
+# Method 1: Standalone 1-liner (no git clone required)
+curl -fsSL https://raw.githubusercontent.com/duynghien/auto/main/crawl4ai/setup.sh | bash
+
+# Method 2: Clone repository
 mkdir -p ~/self-hosted
 cd ~/self-hosted
 git clone https://github.com/duynghien/auto.git
 cd auto/crawl4ai
-
-# Run unified setup (detects OS automatically)
 chmod +x setup.sh c4ai.sh
 ./setup.sh
 ```
 
-The script will:
-1. Detect OS and architecture
-2. Install Docker & dependencies (Linux only)
-3. Configure Swap & Memory limits (Linux only)
-4. Configre LLM API keys (optional)
-5. Deploy container and set up auto-start service (Linux)
-
 ### 📦 Management
 
-Use the helper script:
+Use the helper script (`c4ai` or `crawl4ai` or `./c4ai.sh`):
 
 ```bash
-./c4ai.sh start     # Start Crawl4AI
-./c4ai.sh stop      # Stop Crawl4AI
-./c4ai.sh restart   # Restart Crawl4AI
-./c4ai.sh status    # Container status + health check
-./c4ai.sh logs      # Follow container logs
-./c4ai.sh update    # Pull latest image & restart
-./c4ai.sh test      # Run health/feature tests
-./c4ai.sh info      # Show all endpoints & MCP tools
-./c4ai.sh shell     # Open shell in container
+c4ai start     # Start Crawl4AI
+c4ai stop      # Stop Crawl4AI
+c4ai restart   # Restart Crawl4AI
+c4ai status    # Container status + health check
+c4ai logs      # Follow container logs
+c4ai update    # Pull latest image & restart
+c4ai test      # Run health/feature tests
+c4ai info      # Show all endpoints & MCP tools
+c4ai shell     # Open shell in container
+c4ai backup    # Archive configurations to ./backups/
+c4ai restore <archive.tar.gz> # Restore configurations from archive
+c4ai doctor    # Run diagnostic health check
+c4ai uninstall # Remove containers and volumes
 ```
 
 ### ⚙️ Configuration
@@ -118,33 +116,33 @@ Hỗ trợ **macOS**, **Raspberry Pi**, và **Linux VPS**.
 ### 🛠️ Hướng dẫn cài đặt
 
 ```bash
-# Tải mã nguồn
+# Cách 1: Cài đặt nhanh 1 dòng lệnh (Standalone không cần clone repo)
+curl -fsSL https://raw.githubusercontent.com/duynghien/auto/main/crawl4ai/setup.sh | bash
+
+# Cách 2: Clone repository
 mkdir -p ~/self-hosted
 cd ~/self-hosted
 git clone https://github.com/duynghien/auto.git
 cd auto/crawl4ai
-
-# Chạy script cài đặt (tự nhận diện OS)
 chmod +x setup.sh c4ai.sh
 ./setup.sh
 ```
 
-Script sẽ tự động:
-1. Nhận diện hệ điều hành
-2. Cài Docker và dependencies (nếu là Linux/Pi)
-3. Cấu hình Swap và giới hạn RAM (nếu RAM thấp)
-4. Thiết lập dịch vụ tự khởi động (systemd)
-
-### 📦 Quản lý
+### 📦 Quản lý nhanh với CLI `c4ai`
 
 ```bash
-./c4ai.sh start     # Khởi động
-./c4ai.sh stop      # Dừng
-./c4ai.sh restart   # Khởi động lại
-./c4ai.sh logs      # Xem logs
-./c4ai.sh test      # Kiểm tra sức khỏe
-./c4ai.sh info      # Hiện tất cả endpoints
-./c4ai.sh update    # Cập nhật phiên bản mới
+c4ai start     # Khởi động
+c4ai stop      # Dừng
+c4ai restart   # Khởi động lại
+c4ai status    # Kiểm tra trạng thái và sức khỏe
+c4ai logs      # Xem logs
+c4ai test      # Kiểm tra sức khỏe & chạy thử crawl
+c4ai info      # Hiện tất cả endpoints & MCP tools
+c4ai update    # Cập nhật phiên bản mới
+c4ai backup    # Sao lưu file cấu hình vào ./backups/
+c4ai restore <file.tar.gz> # Khôi phục file cấu hình
+c4ai doctor    # Kiểm tra chẩn đoán hệ thống
+c4ai uninstall # Xóa containers và volumes
 ```
 
 ### 🗺️ Địa chỉ truy cập

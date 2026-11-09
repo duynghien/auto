@@ -36,21 +36,50 @@ Mục tiêu:
   - `mariadb-dump` (ưu tiên) hoặc `mysqldump`
   - `mariadb`/`mysql` client (để restore DB)
 
-## Cài đặt nhanh (lần đầu)
+## Cài đặt nhanh (Quick Setup - Standalone)
 
-Repo này nằm trong project tổng hợp `auto`, bạn cần clone về:
+Bạn có thể chạy trực tiếp standalone hoặc clone repo:
 
 ```bash
+# Cách 1: Chạy trực tiếp từ GitHub (Standalone)
+curl -fsSL https://raw.githubusercontent.com/duynghien/auto/main/wordops/setup.sh | sudo bash
+
+# Cách 2: Clone repository
 git clone https://github.com/duynghien/auto.git
 cd auto/wordops
 sudo bash setup.sh
 ```
 
 Setup sẽ:
-1. Hỏi thông tin cấu hình và lưu vào `backup.env`.
-2. Cài script vào `/opt/scripts` (hoặc đường dẫn bạn nhập).
-3. Lưu `backup.env` duy nhất ngay cạnh `backup.sh`/`restore.sh`.
-4. Tạo cron tự động (nếu bạn bật).
+1. Hỏi thông tin cấu hình và lưu vào `backup.env` (chmod 600).
+2. Tự động sinh `backup.sh`, `restore.sh`, và CLI quản lý `wo-backup.sh`.
+3. Tạo symlink toàn hệ thống: `/usr/local/bin/wo-backup`.
+4. Tạo cron tự động (nếu bật).
+
+## Quản lý nhanh với `wo-backup` CLI
+
+Sau khi cài đặt, bạn có thể dùng lệnh `wo-backup` mọi lúc từ terminal:
+
+```bash
+# Kiểm tra trạng thái WordOps stack và lịch cron
+wo-backup status
+
+# Chạy backup thủ công ngay lập tức
+wo-backup run-backup
+
+# Khôi phục toàn bộ (files + DB)
+wo-backup restore YYYY-MM-DD domain.com --yes
+
+# Chỉ khôi phục files hoặc DB
+wo-backup restore YYYY-MM-DD domain.com --files-only --yes
+wo-backup restore YYYY-MM-DD domain.com --db-only --yes
+
+# Kiểm tra sức khoẻ hệ thống, dependencies, quyền file
+wo-backup doctor
+
+# Gỡ bỏ cron backup
+wo-backup uninstall
+```
 
 ## Cấu hình
 
@@ -63,7 +92,7 @@ Bạn có thể tham khảo mẫu biến tại:
 
 - `config/backup.env.example`
 
-## Chạy backup thủ công
+## Chạy backup thủ công (Trực tiếp qua script)
 
 ```bash
 sudo bash /opt/scripts/backup.sh
@@ -75,7 +104,7 @@ Log runtime:
 tail -f /var/log/backup-*.log
 ```
 
-## Restore
+## Restore (Trực tiếp qua script)
 
 Khôi phục full (files + DB):
 

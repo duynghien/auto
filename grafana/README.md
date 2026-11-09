@@ -53,17 +53,21 @@ chmod +x setup.sh
 ### Management
 
 ```bash
-./grafana.sh start
-./grafana.sh stop
-./grafana.sh restart
-./grafana.sh status
-./grafana.sh logs grafana
-./grafana.sh health
-./grafana.sh datasource
-./grafana.sh dashboard
-./grafana.sh credentials
-./grafana.sh upgrade
-./grafana.sh reset
+./grafana.sh start        # Start/upgrade stack
+./grafana.sh stop         # Stop services
+./grafana.sh restart      # Restart services
+./grafana.sh status       # Show service status
+./grafana.sh logs [svc]   # Follow logs (default: grafana)
+./grafana.sh health       # Check /api/health
+./grafana.sh backup       # Backup provisioning and data volume to ./backups
+./grafana.sh restore <f>  # Safe restore configuration from backup
+./grafana.sh doctor       # Diagnostics: containers, ports, health, datasource
+./grafana.sh datasource   # Show provisioned Prometheus datasource
+./grafana.sh dashboard    # Show starter dashboard metadata
+./grafana.sh credentials  # Show Grafana login and Prometheus target
+./grafana.sh upgrade      # Pull latest images and restart (alias: update)
+./grafana.sh uninstall    # Clean uninstall (keep data or full purge)
+./grafana.sh reset        # Delete Grafana data volume
 ```
 
 ### Files Generated
@@ -137,17 +141,21 @@ chmod +x setup.sh
 ### Quản lý
 
 ```bash
-./grafana.sh start
-./grafana.sh stop
-./grafana.sh restart
-./grafana.sh status
-./grafana.sh logs grafana
-./grafana.sh health
-./grafana.sh datasource
-./grafana.sh dashboard
-./grafana.sh credentials
-./grafana.sh upgrade
-./grafana.sh reset
+./grafana.sh start        # Khởi động/cập nhật stack
+./grafana.sh stop         # Dừng services
+./grafana.sh restart      # Khởi động lại
+./grafana.sh status       # Xem trạng thái services
+./grafana.sh logs [svc]   # Xem logs (mặc định: grafana)
+./grafana.sh health       # Kiểm tra endpoint /api/health
+./grafana.sh backup       # Sao lưu cấu hình provisioning và data volume vào ./backups
+./grafana.sh restore <f>  # Khôi phục cấu hình an toàn từ file backup
+./grafana.sh doctor       # Chuẩn đoán: containers, cổng, health, datasource
+./grafana.sh datasource   # Xem thông tin datasource Prometheus đã cấu hình
+./grafana.sh dashboard    # Xem metadata starter dashboard
+./grafana.sh credentials  # Hiển thị tài khoản đăng nhập & đích Prometheus
+./grafana.sh upgrade      # Kéo images mới nhất & khởi động lại (alias: update)
+./grafana.sh uninstall    # Gỡ cài đặt (giữ data hoặc xóa sạch)
+./grafana.sh reset        # Xóa volume dữ liệu Grafana
 ```
 
 ### Các file được tạo

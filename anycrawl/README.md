@@ -23,21 +23,35 @@ The most complete and optimized self-hosted stack for **AnyCrawl**, featuring en
 
 ### 🛠️ Installation Guide
 
-Open your Terminal and run the following commands:
+Run standalone with a single command or clone the repository:
 
 ```bash
-# Clone the automation repository
-mkdir -p ~/self-hosted
-cd ~/self-hosted
-git clone https://github.com/duynghien/auto.git anycrawl-stack
-cd anycrawl-stack/anycrawl
+# Method 1: Standalone 1-liner (no git clone required)
+curl -fsSL https://raw.githubusercontent.com/duynghien/auto/main/anycrawl/setup.sh | bash
 
-# Run the unified setup script
+# Method 2: Clone repository
+git clone https://github.com/duynghien/auto.git
+cd auto/anycrawl
 chmod +x setup.sh
 ./setup.sh
 ```
 
-The script will automatically detect your OS (macOS, Pi, or VPS) and configure the environment accordingly.
+### ⚡ Management CLI (`anycrawl`)
+
+After installation, use the `anycrawl` command anywhere in your terminal:
+
+```bash
+anycrawl status     # Check container health and port bindings
+anycrawl logs       # Follow AnyCrawl core logs (or anycrawl logs <service>)
+anycrawl start      # Start stack
+anycrawl stop       # Stop stack
+anycrawl restart    # Restart stack
+anycrawl backup     # Archive PostgreSQL database and configurations
+anycrawl restore <archive.sql.gz> # Restore PostgreSQL database
+anycrawl update     # Pull images, rebuild MCP server, and restart
+anycrawl doctor     # Run diagnostic health check
+anycrawl uninstall  # Remove containers and volumes
+```
 
 ### 🤖 MCP Integration (AI Agents)
 Connect AnyCrawl to your favorite AI Agent (Claude, LobeHub) using the MCP endpoint:
@@ -80,18 +94,34 @@ Bộ cài đặt tự động AnyCrawl tối ưu nhất, tích hợp đầy đ�
 
 ### 🛠️ Hướng dẫn cài đặt
 
-Mở Terminal và chạy các lệnh sau:
+Chạy cài đặt nhanh với 1 dòng lệnh hoặc clone repository:
 
 ```bash
-# Tải bộ cài đặt
-mkdir -p ~/self-hosted
-cd ~/self-hosted
-git clone https://github.com/duynghien/auto.git anycrawl-stack
-cd anycrawl-stack/anycrawl
+# Cách 1: Chạy trực tiếp (Standalone không cần clone repo)
+curl -fsSL https://raw.githubusercontent.com/duynghien/auto/main/anycrawl/setup.sh | bash
 
-# Chạy script cài đặt (tự nhận diện OS)
+# Cách 2: Clone repository
+git clone https://github.com/duynghien/auto.git
+cd auto/anycrawl
 chmod +x setup.sh
 ./setup.sh
+```
+
+### ⚡ Quản lý nhanh với `anycrawl` CLI
+
+Sau khi cài đặt xong, bạn có thể gọi lệnh `anycrawl` trực tiếp từ Terminal:
+
+```bash
+anycrawl status     # Kiểm tra trạng thái và sức khỏe containers
+anycrawl logs       # Xem log AnyCrawl (hoặc anycrawl logs <tên_service>)
+anycrawl start      # Khởi động hệ thống
+anycrawl stop       # Dừng hệ thống
+anycrawl restart    # Khởi động lại
+anycrawl backup     # Sao lưu database PostgreSQL và cấu hình vào ./backups
+anycrawl restore <file.sql.gz> # Khôi phục database từ file backup
+anycrawl update     # Kéo image mới, build lại MCP server và restart
+anycrawl doctor     # Kiểm tra lỗi cấu hình, disk, cổng mạng
+anycrawl uninstall  # Xóa sạch container và dữ liệu (yêu cầu gõ yes)
 ```
 
 ### 🤖 Tích hợp AI Agent (MCP)

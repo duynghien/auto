@@ -63,16 +63,19 @@ chmod +x setup.sh
 After installation, use:
 
 ```bash
-./n8n.sh start
-./n8n.sh stop
-./n8n.sh restart
-./n8n.sh status
-./n8n.sh logs [service]
-./n8n.sh health
-./n8n.sh upgrade
-./n8n.sh env
-./n8n.sh doctor
-./n8n.sh reset
+./n8n.sh start        # Start n8n stack
+./n8n.sh stop         # Stop services
+./n8n.sh restart      # Restart services
+./n8n.sh status       # Show service status
+./n8n.sh logs [svc]   # Follow logs (default: n8n)
+./n8n.sh health       # Check /healthz endpoint
+./n8n.sh backup       # Backup database (PostgreSQL/SQLite) & .env (chmod 600)
+./n8n.sh restore <f>  # Safe restore with pre-restore safety dump
+./n8n.sh doctor       # Diagnostics: status, port, healthz, db, disk
+./n8n.sh upgrade      # Pull/update containers (alias: update)
+./n8n.sh env          # Show selected env values
+./n8n.sh uninstall    # Clean uninstall (keep data or full purge)
+./n8n.sh reset        # Delete all local data volumes
 ```
 
 ### Important Notes
@@ -140,16 +143,19 @@ chmod +x setup.sh
 ### Quan ly sau cai dat
 
 ```bash
-./n8n.sh start
-./n8n.sh stop
-./n8n.sh restart
-./n8n.sh status
-./n8n.sh logs [service]
-./n8n.sh health
-./n8n.sh upgrade
-./n8n.sh env
-./n8n.sh doctor
-./n8n.sh reset
+./n8n.sh start        # Khởi động n8n stack
+./n8n.sh stop         # Dừng services
+./n8n.sh restart      # Khởi động lại
+./n8n.sh status       # Xem trạng thái services
+./n8n.sh logs [svc]   # Xem logs (mặc định: n8n)
+./n8n.sh health       # Kiểm tra endpoint /healthz
+./n8n.sh backup       # Sao lưu database (PostgreSQL/SQLite) & .env vào ./backups
+./n8n.sh restore <f>  # Khôi phục an toàn kèm snapshot tự động
+./n8n.sh doctor       # Chuẩn đoán: status, cổng, healthz, db, dung lượng
+./n8n.sh upgrade      # Cập nhật containers (alias: update)
+./n8n.sh env          # Xem cấu hình .env tóm tắt
+./n8n.sh uninstall    # Gỡ cài đặt (giữ data hoặc xóa sạch)
+./n8n.sh reset        # Xóa toàn bộ volume dữ liệu
 ```
 
 ### Luu y

@@ -20,15 +20,20 @@ chmod +x setup.sh
 sudo ./setup.sh
 ```
 
-### Menu Options
+### Management CLI (`pi-toolbox`)
 
-1. **Install Docker & Compose**: Installs Docker engine and Docker Compose plugin (official method).
-2. **Install Portainer CE**: Deploys Portainer for container management on port `9443`.
-3. **Install Full Stack**: Installs both Docker and Portainer.
-4. **System Optimization**:
-   - Updates all packages (`apt update && upgrade`).
-   - Installs useful tools: `htop`, `btop`, `neofetch`, `git`, `curl`.
-   - **Auto-Swap**: Adds 2GB swap file if RAM < 3GB (essential for compiling/heavy loads).
+After setup, run `pi-toolbox` (or `./pi-toolbox.sh` in `~/self-hosted/raspberry-pi/`) to manage your Pi:
+
+```bash
+pi-toolbox status      # Check Portainer container and system status
+pi-toolbox doctor      # Diagnose CPU temperature, throttling, RAM, Swap & disk
+pi-toolbox start       # Start Portainer container
+pi-toolbox stop        # Stop Portainer container
+pi-toolbox restart     # Restart Portainer container
+pi-toolbox logs        # View Portainer logs
+pi-toolbox update      # Pull latest Portainer CE image and recreate container
+pi-toolbox uninstall   # Safely remove Portainer container
+```
 
 ---
 
@@ -48,15 +53,20 @@ chmod +x setup.sh
 sudo ./setup.sh
 ```
 
-### Các tùy chọn
+### Lệnh Quản Lý CLI (`pi-toolbox`)
 
-1. **Cài Docker & Compose**: Cài đặt Docker engine và plugin Docker Compose (theo chuẩn mới nhất).
-2. **Cài Portainer CE**: Cài giao diện quản lý Portainer (cổng `9443`).
-3. **Cài Full Stack**: Cài cả Docker và Portainer cùng lúc.
-4. **Tối ưu hệ thống**:
-   - Cập nhật hệ thống (`apt update && upgrade`).
-   - Cài các công cụ quản lý: `htop`, `btop`, `neofetch`...
-   - **Tự động Swap**: Tạo 2GB Root Swap nếu RAM < 3GB (quan trọng để tránh treo máy khi tải nặng).
+Sau khi cài đặt, bạn có thể chạy lệnh `pi-toolbox` (hoặc file `./pi-toolbox.sh` trong `~/self-hosted/raspberry-pi/`):
+
+```bash
+pi-toolbox status      # Kiểm tra trạng thái Portainer và hệ thống
+pi-toolbox doctor      # Chẩn đoán nhiệt độ CPU, throttling, RAM, Swap & ổ đĩa
+pi-toolbox start       # Khởi động Portainer
+pi-toolbox stop        # Dừng Portainer
+pi-toolbox restart     # Khởi động lại Portainer
+pi-toolbox logs        # Xem log Portainer
+pi-toolbox update      # Cập nhật Portainer CE lên bản mới nhất
+pi-toolbox uninstall   # Gỡ bỏ container Portainer an toàn
+```
 
 ---
 

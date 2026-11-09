@@ -26,15 +26,15 @@ Automated setup script for **Twenty CRM** on **macOS** and **Linux** (AMD64/ARM6
 ### 🛠 Installation
 
 ```bash
-# Clone repository
+# Method 1: Standalone 1-liner
+curl -fsSL https://raw.githubusercontent.com/duynghien/auto/main/twenty/setup.sh | bash
+
+# Method 2: Clone repository
 mkdir -p ~/self-hosted
 cd ~/self-hosted
 git clone https://github.com/duynghien/auto.git
 cd auto/twenty
-
-# Run setup
-chmod +x setup.sh
-./setup.sh
+chmod +x setup.sh && ./setup.sh
 ```
 
 What the setup script does:
@@ -57,27 +57,23 @@ After successful install:
 - **Twenty CRM**: `http://localhost:3020` (or your selected port)
 - **Health Check**: `http://localhost:<your-port>/healthz`
 
-### 🛠 Management (Helper Script)
+### 🛠 Management (`twenty` CLI)
 
-Use the generated helper script for quick operations:
+Use the helper CLI `twenty` (or `./twenty.sh`):
 
 ```bash
-cd ~/self-hosted/twenty
-./twenty.sh status
-./twenty.sh logs
-./twenty.sh restart
-./twenty.sh health
-./twenty.sh update
+twenty status   # Check container status
+twenty logs     # View logs (default: server)
+twenty start    # Start all services
+twenty stop     # Stop all services
+twenty restart  # Restart all services
+twenty update   # Pull latest images and restart
+twenty health   # Check /healthz endpoint
+twenty backup   # Dump PostgreSQL database & archive configs to ./backups/
+twenty restore <archive.sql.gz> # Safely restore database
+twenty doctor   # Run diagnostic health checks
+twenty uninstall # Remove containers and data volumes
 ```
-
-Available commands:
-- `start` — start all services
-- `stop` — stop all services
-- `restart` — restart all services
-- `logs [service]` — stream logs (default: `server`)
-- `status` — show container status
-- `update` — pull latest images and restart
-- `health` — check `/healthz`
 
 ### 🔐 Important
 
@@ -124,15 +120,15 @@ Script tự động cài đặt **Twenty CRM** trên **macOS** và **Linux** (AM
 ### 🛠 Cài đặt
 
 ```bash
-# Clone repository
+# Cách 1: Cài đặt nhanh 1 dòng lệnh (Standalone)
+curl -fsSL https://raw.githubusercontent.com/duynghien/auto/main/twenty/setup.sh | bash
+
+# Cách 2: Clone repository
 mkdir -p ~/self-hosted
 cd ~/self-hosted
 git clone https://github.com/duynghien/auto.git
 cd auto/twenty
-
-# Chạy setup
-chmod +x setup.sh
-./setup.sh
+chmod +x setup.sh && ./setup.sh
 ```
 
 Script sẽ:
@@ -155,27 +151,21 @@ Sau khi cài đặt thành công:
 - **Twenty CRM**: `http://localhost:3020` (hoặc cổng bạn chọn)
 - **Health Check**: `http://localhost:<port>/healthz`
 
-### 🛠 Quản lý nhanh (Helper Script)
-
-Dùng script helper để thao tác nhanh:
+### 🛠 Quản lý nhanh với CLI `twenty`
 
 ```bash
-cd ~/self-hosted/twenty
-./twenty.sh status
-./twenty.sh logs
-./twenty.sh restart
-./twenty.sh health
-./twenty.sh update
+twenty status   # Xem trạng thái containers
+twenty logs     # Xem logs (mặc định: server)
+twenty start    # Chạy toàn bộ dịch vụ
+twenty stop     # Dừng toàn bộ dịch vụ
+twenty restart  # Khởi động lại dịch vụ
+twenty update   # Kéo image mới và khởi động lại
+twenty health   # Kiểm tra endpoint /healthz
+twenty backup   # Sao lưu PostgreSQL và cấu hình vào ./backups/
+twenty restore <file.sql.gz> # Khôi phục cơ sở dữ liệu
+twenty doctor   # Chẩn đoán sức khỏe hệ thống
+twenty uninstall # Xóa sạch containers và volumes
 ```
-
-Các lệnh hỗ trợ:
-- `start` — chạy toàn bộ dịch vụ
-- `stop` — dừng toàn bộ dịch vụ
-- `restart` — khởi động lại dịch vụ
-- `logs [service]` — xem logs realtime (mặc định: `server`)
-- `status` — xem trạng thái containers
-- `update` — kéo image mới và khởi động lại
-- `health` — kiểm tra `/healthz`
 
 ### 🔐 Lưu ý quan trọng
 
