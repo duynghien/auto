@@ -69,10 +69,10 @@ ELAPSED=0
 NODE_UP_OK=false
 while [[ "$ELAPSED" -lt "$TIMEOUT" ]]; do
     RESPONSE=$(curl -fsS --get "http://localhost:${PORT}/api/v1/query" --data-urlencode 'query=max(up{job="node"})' 2>/dev/null || true)
-    if [[ -n "$RESPONSE" ]] && printf '%s' "$RESPONSE" | python3 - <<'PY'
+    if [[ -n "$RESPONSE" ]] && python3 - "$RESPONSE" <<'PY'
 import json
 import sys
-payload = json.load(sys.stdin)
+payload = json.loads(sys.argv[1])
 if payload.get('status') != 'success':
     raise SystemExit(1)
 result = payload.get('data', {}).get('result', [])
