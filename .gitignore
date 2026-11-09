@@ -93,6 +93,9 @@ docker-compose.override.yml
 # Project Specific Ignored Sources
 **/anycrawl-source/
 **/crawl4ai-source/
+**/firecrawl-source/
+**/bolt.diy-source/
+**/mem0-source/
 **/test_lobehub.sh
 **/searxng/settings.yml.bak
 **/searxng/__pycache__/
@@ -105,3 +108,5 @@ proxies/Caddyfile
 
 # Temp
 temp/
+plans/
+
